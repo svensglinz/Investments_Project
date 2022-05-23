@@ -10,3 +10,6 @@ Restrictions:
 
 Results: 
 
+![in sample](plots/in_sample.png)
+
+![](plots/out_sample.png)

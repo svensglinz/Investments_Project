@@ -10,6 +10,7 @@ Restrictions:
 
 Results: 
 
+<img src="mystocks.png" alt="drawing" width="800"/>
 ![in sample](plots/in_sample.png)
 
 ![](plots/out_sample.png)

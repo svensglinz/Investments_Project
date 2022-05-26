@@ -206,7 +206,7 @@ plt.legend(out_sample[["strategy_gross", "benchmark_gross"]].columns)
 plt.title("Out of Sample Strategy Performance", size = 20)
 plt.ylabel("Cumulative Return")
 plt.xlabel("Date")
-plt.savefig("outofsample_performance.png")
+plt.savefig("plots/outofsample_performance.png")
 
 #in sample strategy vs. benchmark
 plt.plot(in_sample[["strategy_gross", "benchmark_gross"]])
@@ -214,7 +214,7 @@ plt.legend(in_sample[["strategy_gross", "benchmark_gross"]].columns)
 plt.title("In Sample Strategy Performance", size = 20)
 plt.ylabel("Cumulative Return")
 plt.xlabel("Date")
-plt.savefig("insample_performance.png")
+plt.savefig("plots/insample_performance.png")
 
 #show strategy returns net vs. gross (shows importance of dividend yield)
 plt.plot(in_sample[["strategy_gross", "strategy_net", "benchmark_gross", "benchmark_net"]])
@@ -222,7 +222,7 @@ plt.legend(in_sample[["strategy_gross", "strategy_net", "benchmark_gross", "benc
 plt.title("In Sample Strategy Performance (net and gross) Comparison", size = 15)
 plt.ylabel("Cumulative Return")
 plt.xlabel("Date")
-plt.savefig("insample_performance_netgross.png")
+plt.savefig("plots/insample_performance_netgross.png")
 
 #plot out of sample short vs long (shows that we outperformed benchmark in both portfolios -> show detailed breakdown)
 plt.plot(out_sample[["strategy_gross", "benchmark_gross", "long_gross", "short_gross"]])
@@ -230,7 +230,7 @@ plt.legend(out_sample[["strategy_gross", "benchmark_gross", "long_gross", "short
 plt.title("Decomposition of out of sample performance", size = 20)
 plt.ylabel("Cumulative Return")
 plt.xlabel("Date")
-plt.savefig("outofsamlpe_brekdown.png")
+plt.savefig("plots/outofsamlpe_brekdown.png")
 
 #plot weights for different optimization techniques (GMVP, MSRP (constrained and unconstrained)
 #XXXXXXXXXXXX
@@ -253,7 +253,7 @@ ax.set(yticks = ind + width, yticklabels = stocks.Name)
 ax.legend(prop={'size': 10})
 plt.title("Stock Weights Strategy vs Index", size = 25)
 plt.xlabel("weights in %", size = 15)
-plt.savefig("strategy_weights.png")
+plt.savefig("plots/strategy_weights.png")
 
 country_weights = stocks[["Country", "weights"]].groupby(by = "Country").sum()
 
@@ -266,7 +266,7 @@ currency_weights = currency_weights.rename(index = {"GBp": "GBP"})
 
 #pie chart of currency weights in strategy
 plt.pie(currency_weights.weights.loc[currency_weights.weights > 0], labels= currency_weights.weights.loc[currency_weights.weights > 0].index, autopct='%1.1f%%')
-plt.savefig("currency_pie_strategy.png")
+plt.savefig("plots/currency_pie_strategy.png")
 
 #plot currency weights stragety vs index
 width = 0.4
@@ -279,7 +279,7 @@ ax.set(yticks = ind + width, yticklabels = currency_weights.index)
 ax.legend(["Strategy", "Index"])
 plt.title("Currency Weights Strategy vs Index", size = 20)
 plt.xlabel("weight in %")
-plt.savefig("curency_comparison.png")
+plt.savefig("plots/curency_comparison.png")
 
 #plot industries
 sector_weights_strategy = stocks[["Sector", "weights"]].groupby(by = "Sector").sum()
@@ -309,7 +309,7 @@ plt.title("High Dividend Stocks vs. Technology Stocks vs Total Market", size = 2
 plt.legend(prices.columns,  prop={'size': 20})
 plt.ylabel("Cumulative Return")
 plt.xlabel("Date")
-plt.savefig("comparison.png")
+plt.savefig("plots/comparison.png")
 
 #############################################################################
 #Calculate Performance Ratios of Strategy and Index (in and out of Sample)
@@ -446,7 +446,7 @@ ratios_table = pd.DataFrame({"Portfolio Short":ratios_short, "Portfolio Long": r
 ratios_table = ratios_table.round(3)
 
 #export table
-dfi.export(ratios_table, "portfolio_characteristics.png")
+dfi.export(ratios_table, "plots/portfolio_characteristics.png")
 
 #also check for correlation breakdowns etc...
 
@@ -563,4 +563,4 @@ plt.xlabel("Volatility", size = 12)
 plt.ylabel("Return", size = 12)
 plt.legend(["Minimum Variance Frontier", "?", "Capital Allocation Line","random portfolios", "GMVP", "MSRP"],
            prop={'size': 10})
-plt.savefig("minimumvariancefrontier.png")
+plt.savefig("plots/minimumvariancefrontier.png")

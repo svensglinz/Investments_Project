@@ -17,10 +17,10 @@ end_backtesting = np.datetime64("2021-12-31")
 
 #import needed cleaned files
 #-----------------------------------------------------------------------------
-constituents = pd.read_csv("index_constituents_data.csv", index_col= 0)
-benchmark = pd.read_csv("benchmark.csv", index_col= 0)
-Gross_Price = pd.read_csv("Gross_Prices_EUR.csv", index_col= 0)
-Net_Price = pd.read_csv("Net_Prices_EUR.csv", index_col= 0)
+constituents = pd.read_csv("files/index_constituents_data.csv", index_col= 0)
+benchmark = pd.read_csv("files/benchmark.csv", index_col= 0)
+Gross_Price = pd.read_csv("files/Gross_Prices_EUR.csv", index_col= 0)
+Net_Price = pd.read_csv("files/Net_Prices_EUR.csv", index_col= 0)
 
 Gross_Price.index = pd.to_datetime(Gross_Price.index)
 Net_Price.index = pd.to_datetime(Net_Price.index)

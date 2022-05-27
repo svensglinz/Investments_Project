@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import math as m
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
 from scipy.optimize import minimize
 from scipy.optimize import Bounds
 import datetime as dt
@@ -39,7 +40,6 @@ in_sample = Stock_Prices[Stock_Prices.index < end_backtesting]
 #estimate expected returns and var-cov matrix for optimization & delete variables which are not needed anymore (for better overview)
 ER = in_sample.pct_change().mean()
 S = in_sample.pct_change().cov()
-del Stock_Prices, in_sample
 
 #define functions for optimization (variance, return,  negative sharp ratio)
 #------------------------------------------------------------------------------
@@ -88,7 +88,7 @@ MSRP_unconst = minimize(sharpe, x0, method='SLSQP', args=(ER,S), constraints = c
 #complete data set of selected stocks with calculated constrained MSRP values & export for presentation
 stocks["weights"] = MSRP_const.x
 stocks["weights_unconst"] = MSRP_unconst.x
-dfi.export(stocks, "selected_portfolio_characteristics.png")
+dfi.export(stocks, "plots/selected_portfolio_characteristics.png")
 
 #############################################################################
 #Calculate Strategy and Benchmark Returns in and out of Sample
@@ -99,7 +99,7 @@ out_sample_cor = Stock_Prices[Stock_Prices.index > end_backtesting].pct_change()
 in_sample_cor =  Stock_Prices[Stock_Prices.index < end_backtesting].pct_change().corr()
 
 rel_cor = out_sample_cor / in_sample_cor
-pd.DataFrame(rel_cor).to_csv("correlation_change.csv")
+pd.DataFrame(rel_cor).to_csv("files/correlation_change.csv")
 
 #DAILY Net Returns / Gross Returns / Net & Gross for long & Short individually over total period
 Net_Returns = Net_Price[stocks.index].pct_change() + 1
@@ -175,7 +175,6 @@ out_sample_all = out_sample_all.pct_change() + 1
 out_sample_all = out_sample_all.fillna(1).cumprod()
 out_return_all = out_sample_all.iloc[len(out_sample_all.index)-1].div(out_sample_all.iloc[0]) - 1
 
-
 #############################################################################
 #Create Plots
 #############################################################################
@@ -188,24 +187,27 @@ ret_contrib = ret_contrib.rename(columns = {0: "return"})
 ret_contrib["diff_return"] = ret_contrib["diff_weights"] * ret_contrib["return"]
 
 #plot and save results
-plt.figure(figsize=(15, 10))
+fig = plt.figure(figsize=(15, 10))
+ax = fig.add_subplot(1,1,1)
 plt.bar(ret_contrib.Name[0:10], ret_contrib.diff_return[0:10])
 plt.bar(ret_contrib.Name[10:39], ret_contrib.diff_return[10:39])
 plt.bar(ret_contrib.Name[39:49], ret_contrib.diff_return[39:49])
 plt.legend(["Long", "Not Invested", "Short"])
+ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
 plt.title("Decomposition of out of Sample excess Returns", size = 20)
 plt.ylabel("Excess Return Strategy vs. Benchmark")
-plt.xlabel("Date")
 plt.subplots_adjust(bottom = 0.3)
 plt.xticks(rotation=90)
-plt.savefig("excess_return_breakdown.png")
+plt.savefig("plots/excess_return_breakdown.png")
 
 #out of sample strategy vs. benchmark
+fig = plt.figure(figsize=(15, 10))
 plt.plot(out_sample[["strategy_gross", "benchmark_gross"]])
 plt.legend(out_sample[["strategy_gross", "benchmark_gross"]].columns)
 plt.title("Out of Sample Strategy Performance", size = 20)
 plt.ylabel("Cumulative Return")
 plt.xlabel("Date")
+
 plt.savefig("plots/outofsample_performance.png")
 
 #in sample strategy vs. benchmark
@@ -251,6 +253,7 @@ ax.barh(ind + width, stocks.index_weights, width, label = "Index Weights")
 ax.barh(ind + 2* width, stocks.weights_unconst, width, label = "Unconstrained Strategy Weights")
 ax.set(yticks = ind + width, yticklabels = stocks.Name)
 ax.legend(prop={'size': 10})
+ax.xaxis.set_major_formatter(mtick.PercentFormatter(1.0))
 plt.title("Stock Weights Strategy vs Index", size = 25)
 plt.xlabel("weights in %", size = 15)
 plt.savefig("plots/strategy_weights.png")
@@ -258,7 +261,8 @@ plt.savefig("plots/strategy_weights.png")
 country_weights = stocks[["Country", "weights"]].groupby(by = "Country").sum()
 
 #plot currencies
-currency_weights_strategy = stocks[["Currency", "weights"]].groupby(by = "Currency").sum()
+constituents = constituents.join(stocks["weights"]).fillna(0)
+currency_weights_strategy = constituents[["Currency", "weights"]].groupby(by = "Currency").sum()
 currency_weights_index = constituents[["Currency", "index_weights"]].groupby(by = "Currency").sum()
 
 currency_weights = currency_weights_index.join(currency_weights_strategy).fillna(0)
@@ -266,7 +270,7 @@ currency_weights = currency_weights.rename(index = {"GBp": "GBP"})
 
 #pie chart of currency weights in strategy
 plt.pie(currency_weights.weights.loc[currency_weights.weights > 0], labels= currency_weights.weights.loc[currency_weights.weights > 0].index, autopct='%1.1f%%')
-plt.savefig("plots/currency_pie_strategy.png")
+plt.savefig("currency_pie_strategy.png")
 
 #plot currency weights stragety vs index
 width = 0.4
@@ -279,7 +283,7 @@ ax.set(yticks = ind + width, yticklabels = currency_weights.index)
 ax.legend(["Strategy", "Index"])
 plt.title("Currency Weights Strategy vs Index", size = 20)
 plt.xlabel("weight in %")
-plt.savefig("plots/curency_comparison.png")
+plt.savefig("curency_comparison.png")
 
 #plot industries
 sector_weights_strategy = stocks[["Sector", "weights"]].groupby(by = "Sector").sum()
@@ -309,7 +313,8 @@ plt.title("High Dividend Stocks vs. Technology Stocks vs Total Market", size = 2
 plt.legend(prices.columns,  prop={'size': 20})
 plt.ylabel("Cumulative Return")
 plt.xlabel("Date")
-plt.savefig("plots/comparison.png")
+
+plt.savefig("comparison.png")
 
 #############################################################################
 #Calculate Performance Ratios of Strategy and Index (in and out of Sample)
@@ -446,7 +451,7 @@ ratios_table = pd.DataFrame({"Portfolio Short":ratios_short, "Portfolio Long": r
 ratios_table = ratios_table.round(3)
 
 #export table
-dfi.export(ratios_table, "plots/portfolio_characteristics.png")
+dfi.export(ratios_table, "portfolio_characteristics.png")
 
 #also check for correlation breakdowns etc...
 
@@ -563,4 +568,4 @@ plt.xlabel("Volatility", size = 12)
 plt.ylabel("Return", size = 12)
 plt.legend(["Minimum Variance Frontier", "?", "Capital Allocation Line","random portfolios", "GMVP", "MSRP"],
            prop={'size': 10})
-plt.savefig("plots/minimumvariancefrontier.png")
+plt.savefig("minimumvariancefrontier.png")

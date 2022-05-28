@@ -1,19 +1,5 @@
-#
-#
-#
-#
-#
-#
-############################################################################
-#load libraries
-############################################################################
-#
-#
-#
-#
-#
-#
 
+#load libraries
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -27,26 +13,19 @@ import datetime as dt
 from sklearn.linear_model import LinearRegression
 import dataframe_image as dfi
 
+#############################################################################
+#                                                                           #
+#                                #SECTION 1                                 #
+#       Define key parameters, import needed files and define investment   #
+#       universe of stocks which the strategy invests in                    #
+#                                                                           #
+#############################################################################
+
 #define parameters of investment period start
 start_backtesting = np.datetime64("2011-01-01")
 end_backtesting = np.datetime64("2021-12-31")
 
-#
-#
-#
-#
-#
-#
-############################################################################
 #Import needed CSV files
-############################################################################
-#
-#
-#
-#
-#
-#
-
 stocks_index = pd.read_csv("files/index_constituents_data.csv", index_col= 0)
 benchmark = pd.read_csv("files/benchmark.csv", index_col= 0)
 Gross_Price = pd.read_csv("files/Gross_Prices_EUR.csv", index_col= 0)
@@ -57,22 +36,7 @@ Gross_Price.index = pd.to_datetime(Gross_Price.index)
 Net_Price.index = pd.to_datetime(Net_Price.index)
 benchmark.index = pd.to_datetime(benchmark.index)
 
-#
-#
-#
-#
-#
-#
-############################################################################
 #Select stocks which the strategy invests in
-############################################################################
-#
-#
-#
-#
-#
-#
-
 #our strategy goes long in the top 10 highest dividend stocks and short in the
 #top 10 lowest dividend stocks --> We select these stocks as our investmnet stocks
 
@@ -85,21 +49,13 @@ stocks_invest = stocks_index.iloc[np.r_[0:10, 39:49]]
 Gross_Price_selected = Gross_Price[stocks_invest.index]
 Net_Price_selected = Net_Price[stocks_invest.index]
 
-#
-#
-#
-#
-#
-#
-############################################################################
-#Calculate Investment Weights
-############################################################################
-#
-#
-#
-#
-#
-#
+#############################################################################
+#                                                                           #
+#                                #SECTION 2                                 #
+#     Calculate Optimal Strategy stock weights with various constraints,
+#     and visualize optimization                                            #
+#                                                                           #
+#############################################################################
 
 #estimate expected returns and var-cov matrix for optimization (with in sample data!)
 ER = Gross_Price_selected[Gross_Price_selected.index < end_backtesting].pct_change().mean()
@@ -155,20 +111,125 @@ stocks_invest["weights"] = MSRP_const.x
 stocks_invest["weights_unconst"] = MSRP_unconst.x
 dfi.export(stocks_invest, "plots/selected_portfolio_characteristics.png")
 
-#
-#
-#
-#
-#
-#
+#---------------------------------------------------------------------------
+                  #Visualize efficient Frontier
+#---------------------------------------------------------------------------
+
+#calculate volatility and expected return of GMVP and MSRP constrained
+GMVP_const_ER = pret(w = GMVP_const.x, ER = ER) * 250
+GMVP_const_VAR = m.sqrt(pvar(w = GMVP_const.x, S = S) * 250)
+MSRP_const_ER =  pret(w = MSRP_const.x, ER = ER) * 250
+MSRP_const_VAR = m.sqrt(pvar(w = MSRP_const.x, S = S) * 250)
+
+#simulate minimum varaince frontier by minimizing the negative of the expected portfolio return
+#given a deterministic variance and the same restrictions as above.
+#we loop over an array of variances and can thus numerically get the MVF
+def pret_sim(w, ER):
+    return (-(w.T @ ER))
+
+#variances to loop over
+a = np.arange(0.1, 0.6, 0.01)
+bounds = Bounds(-0.2, 0.2)
+
+#initialize lists to store results in
+MVF_var_const = []
+MVF_ret_const = []
+
+#loop over variances and maximize expected return given that portfolio variance = given variance
+for i in a:
+    max_var = i
+    cons = ({"type": "eq", "fun" : lambda x: np.sum(x) - 1},
+            {"type": "eq", "fun" : lambda x: m.sqrt((x.T @ S @ x)* 250) - max_var},
+            {"type": "ineq", "fun": lambda x: -min_weight - x[10:20]},
+            {"type": "ineq", "fun": lambda x: x[0:10] - min_weight})
+
+    maximized = minimize(pret_sim, x0, method='SLSQP', args= ER,
+                         options={'disp': True, 'ftol': 1e-9},
+                         constraints=cons, bounds = bounds)
+
+    #only store result if optimization was successful!
+    if maximized.success:
+        MVF_var_const.append(i)
+        MVF_ret_const.append(maximized.fun * -250)
+    else:
+        continue
+
+#simulate random constrained portfolios
+#we simulate random portfolios which fulfil all restrictions by minimzing a "random" function which uses a random
+#array and the modulus to generate different portfolios
+
+random_portfolio = []
+
+def rand_funct(x,y):
+    return ((x % y)/y).sum()
+
+cons = ({"type": "eq", "fun" : lambda x: np.sum(x) - 1},
+        {"type": "ineq", "fun": lambda x: -min_weight - x[10:20]},
+        {"type": "ineq", "fun": lambda x: x[0:10] - min_weight})
+
+i = 0
+while i < 100:
+    y = np.random.uniform(low= 0, high=1, size=20)
+    MSRP_sim = minimize(rand_funct, x0, method='SLSQP', args= y,
+                        constraints=cons, options={'disp': True, 'ftol': 1e-9},
+                        bounds = bounds)
+    i = i + 1
+
+    #only store successful optimizations
+    if MSRP_sim.success:
+        random_portfolio.append(MSRP_sim.x)
+    else:
+        continue
+
+MVF_randvar_const = []
+MVF_randret_const = []
+
+#calculate return and variance (yearly) from calculated "random" portfolios
+for i in range(len(random_portfolio)):
+    exp_return = pret(w = random_portfolio[i], ER = ER)
+    exp_var = pvar(w = random_portfolio[i], S = S)
+    exp_return_year = exp_return * 250
+    exp_var_year = m.sqrt(exp_var * 250)
+
+    MVF_randvar_const.append(exp_var_year)
+    MVF_randret_const.append(exp_return_year)
+
+#plot results
+MVF_var_const.insert(0, GMVP_const_VAR)
+MVF_ret_const.insert(0, GMVP_const_ER)
+CAL_x = np.linspace(0, MSRP_const_VAR + 0.2, 50, endpoint=True)
+SR_MSRP = MSRP_const_ER / MSRP_const_VAR
+CAL_y = 0 + SR_MSRP*CAL_x
+
+frontier_points = pd.DataFrame({"variance": MVF_var_const, "return": MVF_ret_const})
+max_ret_index = frontier_points["return"].idxmax()
+
+#plot part that goes down again grey!
+plt.figure(figsize=(15, 10))
+plt.plot(frontier_points.variance.iloc[0:max_ret_index + 1], frontier_points["return"].iloc[0:max_ret_index + 1])
+plt.plot(frontier_points.variance.iloc[max_ret_index: len(frontier_points)],
+         frontier_points["return"].iloc[max_ret_index: len(frontier_points)], color = "grey", ls =  "--")
+
+plt.scatter(MVF_randvar_const, MVF_randret_const)
+plt.scatter(GMVP_const_VAR, GMVP_const_ER, s = 70)
+plt.scatter(MSRP_const_VAR, MSRP_const_ER, s = 70)
+plt.plot(CAL_x, CAL_y)
+plt.xlim([0,0.4])
+plt.ylim([0,0.3])
+plt.title("Minimum Variance Frontier Simulated", size = 22)
+plt.xlabel("Volatility", size = 12)
+plt.ylabel("Return", size = 12)
+plt.legend(["Minimum Variance Frontier", "?", "Capital Allocation Line","random portfolios", "GMVP", "MSRP"],
+           prop={'size': 10})
+plt.savefig("minimumvariancefrontier.png")
+
 #############################################################################
-#Calculate Strategy and Benchmark Returns in and out of Sample
+#                                                                           #
+#                                #SECTION 2                                 #
+#     Calculate  returns of     #
+#                 strategy and benchmark in and out of sample               #
+#                                                                           #
 #############################################################################
-#
-#
-#
-#
-3
 
 #function which calculates the indexed performance (start = 1) of various stocks and start investment weights
 def indexed_performance(start, prices, weights, end = None):
@@ -227,21 +288,181 @@ out_sample = out_sample.join(benchmark)
 in_sample[["benchmark_gross", "benchmark_net"]] = in_sample[["benchmark_gross", "benchmark_net"]].div(in_sample[["benchmark_gross", "benchmark_net"]].head(1).iloc[0])
 out_sample[["benchmark_gross", "benchmark_net"]] = out_sample[["benchmark_gross", "benchmark_net"]].div(out_sample[["benchmark_gross", "benchmark_net"]].head(1).iloc[0])
 
-#
-#
-#
-#
-#
-#
+#save in and out of sample returns
+in_sample.to_csv("files/in_sample.csv")
+out_sample.to_csv("files/out_sample.csv")
+
 #############################################################################
-#                           Create Plots
+#                                                                           #
+#                            #SECTION 3                                     #
+#        #Calculate in and out of sample risk & performance ratios          #
+#                                                                           #
 #############################################################################
-#
-#
-#
-#
-#
-#
+
+#---------------------------------------------------------------------------
+                        #Percent Formatting
+#---------------------------------------------------------------------------
+#Function that returns a float number rounded to n digits and returns
+#it as a string with "%" in the end (ie. in: 0.467, out: 46.7%)
+
+def to_pct(x, digits):
+    out = str(round(x * 100, digits)) + "%"
+    return out
+
+#---------------------------------------------------------------------------
+                        #Annualized Sharp Ratio
+#---------------------------------------------------------------------------
+
+#days = days per year (assumed 250 here)
+#rf_rate = annualized risk free rate
+#prices for which ratio should be alculated
+
+def sharp_ratio(price, days, rf_rate, pct = True):
+    ER = price.pct_change().mean()
+    SD = price.pct_change().std()
+    SR = (ER-rf_rate/days)/SD * m.sqrt(days)
+
+    if pct:
+        return to_pct(SR, 2)
+    else:
+        return SR
+
+#---------------------------------------------------------------------------
+                        #Yearly volatility
+#---------------------------------------------------------------------------
+
+def yearly_vol(price, days, pct = True):
+    vol = m.sqrt(price.pct_change().var() * days)
+
+    if pct:
+        return to_pct(vol, 2)
+    else:
+        return vol
+
+#---------------------------------------------------------------------------
+                        #alpha and beta
+#---------------------------------------------------------------------------
+
+#period = period of returns for which regression should be run (eg. "1Y", "1M", "1d")
+#kwargs = optional where only alpha, beta, x or y can be returned form function (param!)
+
+def alpha_beta(strategy, benchmark, period, **kwargs):
+
+    daily_ret_strategy = strategy.pct_change().fillna(0) + 1
+    daily_ret_BM = benchmark.pct_change().fillna(0) + 1
+
+    period_ret_strategy = daily_ret_strategy.groupby(pd.Grouper(freq=period)).prod() - 1
+    period_ret_BM = daily_ret_BM.groupby(pd.Grouper(freq=period)).prod() -1
+
+    model = LinearRegression().fit(period_ret_BM.to_numpy().reshape((-1,1)),
+                                    period_ret_strategy.to_numpy().reshape((-1,1)))
+
+    beta = model.coef_[0][0]
+    alpha = model.intercept_[0]
+
+    results = {"alpha": to_pct(alpha,2),
+               "beta": round(beta,2),
+               "x": period_ret_BM.to_list(),
+               "y": period_ret_strategy.to_list()}
+
+    if len(kwargs) == 0:
+        return(results)
+    else:
+        return(results.get(kwargs.get("param")))
+
+#---------------------------------------------------------------------------
+                        #Maximum Drawdown
+#---------------------------------------------------------------------------
+
+def maxdd(price, pct = True):
+    maxdd = price.diff().cumsum().min()
+
+    if pct:
+        return to_pct(maxdd, 2)
+    else:
+        return maxdd
+
+#---------------------------------------------------------------------------
+                        #N Day unfiltered 99% VAR
+#---------------------------------------------------------------------------
+
+#N as string (ie. "1d", "5d", "1M"...)
+def NDAYVar(price, N, pct = True):
+    daily_ret = price.pct_change().fillna(0) + 1
+    nday_ret = daily_ret.groupby(pd.Grouper(freq= N)).prod() - 1
+    VAR = nday_ret.quantile(0.01)
+
+    if pct:
+        return to_pct(np.abs(VAR), 2)
+    else:
+        return np.abs(VAR)
+
+#---------------------------------------------------------------------------
+                #Expected N day return or total Return
+#---------------------------------------------------------------------------
+
+def nday_ret(price, N = None, TR = False, pct = True):
+
+    if TR:
+        ret = price.tail(1)[0] / price.head(1)[0] -1
+    else:
+        ret = price.pct_change().mean() * N
+    if pct:
+        return to_pct(ret, 2)
+    else:
+        return ret
+
+#define return series for which ratios should be calculated:
+BM_in = in_sample["benchmark_gross"]
+BM_out = out_sample["benchmark_gross"]
+strategy_in = in_sample["strategy_gross"]
+strategy_out = out_sample["strategy_gross"]
+
+BM_in = {"Avg. Yearly Return": nday_ret(BM_in, N = 250),
+         "Avg. Yearly Sharp Ratio": sharp_ratio(BM_in, days = 250, rf_rate = 0),
+         "Max. Drawdown": maxdd(BM_in, "5d"),
+         "Alpha (monthly Returns)": "0%",
+         "Beta (monthly Returns)": 1,
+         "Avg. Ann. Vol": yearly_vol(BM_in, days = 250),
+         "5d 99% VAR": NDAYVar(BM_in, N = "5d")}
+
+BM_out = {"Return YTD": nday_ret(BM_out, TR = True),
+         "Avg. Yearly Sharp Ratio": sharp_ratio(BM_out, days = 250, rf_rate = 0),
+         "Max. Drawdown": maxdd(BM_out, "5d"),
+         "Alpha (weekly Returns)": "0%",
+         "Beta (weekly Returns)": 1,
+         "Avg. Ann. Vol": yearly_vol(BM_out, days = 250),
+         "5d 99% VAR": NDAYVar(BM_out, N = "5d")}
+
+strategy_in = {"Avg. Yearly Return": nday_ret(strategy_in, N = 250),
+               "Avg. Yearly Sharp Ratio": sharp_ratio(strategy_in, days = 250, rf_rate = 0),
+               "Max. Drawdown": maxdd(strategy_in, "5d"),
+               "Alpha (monthly Returns)": alpha_beta(strategy_in, BM_in, "1M", param = "alpha"),
+               "Beta (monthly Returns)": alpha_beta(strategy_in, BM_in, "1M", param = "beta"),
+               "Avg. Ann. Vol": yearly_vol(strategy_in, days = 250),
+               "5d 99% VAR": NDAYVar(strategy_in, N = "5d")}
+
+strategy_out = {"Return YTD": nday_ret(strategy_out, N = 250),
+                "Avg. Yearly Sharp Ratio": sharp_ratio(strategy_out, days = 250, rf_rate = 0),
+                "Max. Drawdown": maxdd(strategy_out, "5d"),
+                "Alpha (weekly Returns)": alpha_beta(strategy_out, BM_out, "5d", param = "alpha"),
+                "Beta (weekly Returns)": alpha_beta(strategy_out, BM_out, "5d", param = "beta"),
+                "Avg. Ann. Vol": yearly_vol(strategy_out, days = 250),
+                "5d 99% VAR": NDAYVar(strategy_out, N = "5d")}
+
+risk_factors_out = pd.DataFrame({"Benchmark": BM_in, "Strategy": strategy_in})
+risk_factors_in = pd.DataFrame({"Benchmark": BM_out, "Strategy": strategy_out})
+
+#export the two data frames with all risk factors included
+dfi.export(risk_factors_out, "plots/risk_factors_out.png")
+dfi.export(risk_factors_in, "plots/risk_factors_in.png")
+
+#############################################################################
+#                                                                           #
+#                            #SECTION 4                                     #
+#        #Calculate and plot portfolio characteristics vs. Benchmark        #
+#                                                                           #
+#############################################################################
 
 #---------------------------------------------------------------------------
             #Excess Return Strategy vs. Benchmark Plot
@@ -446,212 +667,21 @@ plt.xticks(size = 15)
 plt.yticks(size = 15)
 plt.savefig("comparison.png")
 
-#
-#
-#
-#
-#
-#############################################################################
-        #Calculate in and out of sample risk & performance ratios
-############################################################################
-#
-#
-#
-#
-#
-#
+#calculate change of correlation  matrix in and out of sample
+out_sample_cor = Stock_Prices[Stock_Prices.index > end_backtesting].pct_change().corr()
+in_sample_cor =  Stock_Prices[Stock_Prices.index < end_backtesting].pct_change().corr()
 
-#calculate annualized sharp ratio
-#days = days per year, assumed to be 250 here
-#rf = yearly risk free interest rate
+rel_cor = out_sample_cor / in_sample_cor
+pd.DataFrame(rel_cor).to_csv("files/correlation_change.csv")
 
-def sharp_ratio(price, days, rf_rate):
-    ER = price.pct_change().mean()
-    SD = price.pct_change().std()
-    SR = (ER-rf_rate/days)/SD * m.sqrt(days)
-    return(SR)
-
-SR_BM_in = sharp_ratio(price = in_sample["benchmark_gross"], days = 250, rf_rate = 0)
-SR_BM_out = sharp_ratio(rice = in_sample["benchmark_gross"], days = 250, rf_rate = 0)
-SR_strategy_in = sharp_ratio(rice = in_sample["strategy_gross"], days = 250, rf_rate = 0)
-SR_strategy_out = sharp_ratio(rice = out_sample["strategy_gross"], days = 250, rf_rate = 0)
-
-#calculate yearly volatility over observation period
-
-def yearly_vol(price, days):
-    vol = m.sqrt(price.pct_change().var() * days)
-    return(vol)
-
-vol_BM_in = yearly_vol(in_sample["benchmark_gross"], days = 250)
-vol_BM_out = yearly_vol(out_sample["benchmark_gross"], days = 250)
-vol_strategy_in = yearly_vol(in_sample["strategy_gross"], days = 250)
-vol_strategy_out = yearly_vol(out_sample["strategy_gross"], days = 250)
-
-#average yearly returns (in sample) and total returns (out sample)
-ret_BM_in = in_sample["benchmark_gross"].pct_change().mean() * 250
-ret_BM_out = out_sample["benchmark_gross"].tail(1)[0] -1
-ret_strategy_in = in_sample["strategy_gross"].pct_change().mean() * 250
-ret_strategy_out = out_sample["strategy_gross"].tail(1)[0] -1
-
-#calculat monthly betas and alphas for strategy in sample (and daily alpha and beta for out sample)????
-
-def alpha_beta(strategy, benchmark, period):
-
-    daily_ret_strategy = strategy.pct_change().fillna(0) + 1
-    daily_ret_BM = benchmark.pct_change().fillna(0) + 1
-
-    #or define freq directly as input!!!
-    period_ret_strategy = daily_ret_strategy.groupby(pd.Grouper(freq=period)).prod() - 1
-    period_ret_BM = daily_ret_BM.groupby(pd.Grouper(freq=period)).prod() -1
-
-    model = LinearRegression().fit(period_ret_BM.to_numpy().reshape((-1,1)),
-                                    period_ret_strategy.to_numpy().reshape((-1,1)))
-
-    beta = model.coef_[0][0]
-    alpha = model.intercept_[0]
-
-    return({"alpha": alpha,
-            "beta": beta,
-            "x": period_ret_BM.to_list(),
-            "y": period_ret_strategy.to_list()})
-
-#retreive beta and alpha (monthly for in sample, 5day (weekly) for out of sample!
-alphabeta_in = alpha_beta(strategy = in_sample["strategy_gross"], benchmark = in_sample["benchmark_gross"], period = "1M")
-alphabeta_out = alpha_beta(strategy = out_sample["strategy_gross"], benchmark = out_sample["benchmark_gross"], period = "5d")
-
-in_sample_beta = alphabeta_in.get("beta")
-in_sample_alpha = alphabeta_in.get("alpha")
-out_sample_beta = alphabeta_out.get("beta")
-out_sample_alpha = alphabeta_out.get("alpha")
-
-#plot regression line
-
-x = np.arange(min(alphabeta_in.get("x"))-0.1, max(alphabeta_in.get("x"))+0.1, 0.01)
-fitted_y = in_sample_alpha + in_sample_beta * x
-
-#assemble plot
-fig, ax = plt.subplots(figsize = (15,10))
-plt.scatter(alphabeta_in.get("x"), alphabeta_in.get("y"))
-plt.plot(x, fitted_y)
-plt.plot(x, x)
-plt.title("Monthly Returns Strategy vs. Benchmark (in sample)", size = 25)
-ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
-ax.xaxis.set_major_formatter(mtick.PercentFormatter(1.0))
-plt.ylabel("Monthly Returns Strategy", size = 15)
-plt.xlabel("Monthly Returns Benchmark", size = 15)
-plt.axhline(0, color = "black", ls = "--", lw = 1)
-plt.axvline(0, color = "black", ls =  "--", lw = 1)
-plt.xticks(size = 15)
-plt.yticks(size = 15)
-plt.legend(["liner fit", "x = y"], prop = {"size": 15})
-plt.savefig("plots/in_sample_alphabetaplot.png")
-
-#calculate maximum drawdown
-
-def maxdd(price):
-    maxdd = price.diff().cumsum().min()
-    return(maxdd)
-
-maxdd_BM_in = maxdd(in_sample["benchmark_gross"])
-maxdd_BM_out = maxdd(out_sample["benchmark_gross"])
-maxdd_strategy_in = maxdd(in_sample["strategy_gross"])
-maxdd_strategy_out = maxdd(out_sample["strategy_gross"])
-
-#calculate unfiltered (!) 99% 5 day VAR (in and out of sample)
-
-#function which calculates the Nday unfiltered VAR.
-#Input: data frame with Daily returns (eg. 1% = 1.01)
-
-#we can use the grouper used above here as well!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! (and then do 5d!)
-def NDAYVar(dailyreturns, N):
-    temp = dailyreturns.reset_index(drop = True)
-    returns_Nday = temp.groupby(temp.index // N).prod() - 1
-    VAR = returns_Nday.quantile(0.01)
-    return(VAR)
-
-VAR_strategy_in = NDAYVar(daily_returns_strategy_in, 5)
-VAR_BM_in = NDAYVar(daily_returns_BM_in, 5)
-VAR_strategy_out = NDAYVar(daily_returns_strategy_out, 5)
-VAR_BM_out = NDAYVar(daily_returns_BM_out, 5)
-
-#
-#
-#
-#
-#
-#############################################################################
-    #assemble data frame with all risk factors (in and out of sample)
-############################################################################
-#
-#
-#
-#
-#
-#
-
-#define function such that we can represent the values as % in our tables
-def to_pct(x, rd):
-    out = str(round(x * 100, rd)) + "%"
-    return out
-
-BM_in = {"Avg. Yearly Return": to_pct(ret_BM_in,2),
-         "Avg. Yearly Sharp Ratio": round(SR_BM_in,2),
-         "Max. Drawdown": to_pct(maxdd_BM_in,2),
-         "Alpha (monthly Returns)": to_pct(0,2),
-         "Beta (monthly Returns)": 1,
-         "Avg. Ann. Vol": to_pct(vol_BM_in,2),
-         "5d 99% VAR": to_pct(VAR_BM_in,2)}
-
-BM_out = {"Return YTD": to_pct(ret_BM_out,2),
-          "Avg. Yearly Sharp Ratio": round(SR_BM_out,2),
-          "Max. Drawdown": to_pct(maxdd_BM_out,2),
-          "Alpha (monthly Returns)": to_pct(0,2),
-          "Beta (monthly Returns)": 1,
-          "Avg. Ann. Vol": to_pct(vol_BM_out,2),
-          "5d 99% VAR": to_pct(VAR_BM_out,2)}
-
-strategy_in = {"Avg. Yearly Return": to_pct(ret_strategy_in,2),
-               "Avg. Yearly Sharp Ratio": round(SR_strategy_in,2),
-               "Max. Drawdown": to_pct(maxdd_strategy_in,2),
-               "Alpha (monthly Returns)": to_pct(in_sample_alpha,2),
-               "Beta (monthly Returns)": round(in_sample_beta,2),
-               "Avg. Ann. Vol": to_pct(vol_strategy_in,2),
-               "5d 99% VAR": to_pct(VAR_strategy_in,2)}
-
-strategy_out = {"Return YTD": to_pct(ret_strategy_out, 2),
-                "Avg. Yearly Sharp Ratio": round(SR_strategy_out,2),
-                "Max. Drawdown": to_pct(maxdd_strategy_out,2),
-                "Alpha (monthly Returns)": to_pct(out_sample_alpha,2),
-                "Beta (monthly Returns)": round(out_sample_beta,2),
-                "Avg. Ann. Vol": to_pct(vol_strategy_out,2),
-                "5d 99% VAR": to_pct(VAR_strategy_out,2)}
-
-risk_factors_out = pd.DataFrame({"Benchmark": BM_in, "Strategy": strategy_in})
-risk_factors_in = pd.DataFrame({"Benchmark": BM_out, "Strategy": strategy_out})
-
-#export the two data frames with all risk factors included
-dfi.export(risk_factors_out, "plots/risk_factors_out.png")
-dfi.export(risk_factors_in, "plots/risk_factors_in.png")
-
-#
-#
-#
-#
-#
-#############################################################################
-        #Calculate in and out of sample portfolio characteristics
-#############################################################################
-#
-#
-#
-#
-#
-#
 
 #calculate performance ratios for short and long portfolios
 stocks_short = stocks_invest[stocks_invest.weights <0]
 stocks_long = stocks_invest[stocks_invest.weights > 0]
 
+#---------------------------------------------------------------------------
+    #Plot performance Nasdaq100 vs. MSCI World vs. FTSE AW-HighDivYield
+#---------------------------------------------------------------------------
 #dividend yield
 div_yield_long = (stocks_long.weights / stocks_long.weights.sum() * stocks_long.Yield).sum()
 div_yield_short = (stocks_short.weights.abs()/ stocks_short.weights.abs().sum() * stocks_short.Yield).sum()
@@ -710,154 +740,3 @@ ratios_table = pd.DataFrame({"Portfolio Short":ratios_short, "Portfolio Long": r
 
 #export table
 dfi.export(ratios_table, "plots/portfolio_characteristics.png")
-
-#
-#
-#
-#
-#
-#############################################################################
-                    #Calculate efficient frontier
-#############################################################################
-#
-#
-#
-#
-#
-#
-
-#calculate volatility and expected return of GMVP and MSRP constrained
-GMVP_const_ER = pret(w = GMVP_const.x, ER = ER) * 250
-GMVP_const_VAR = m.sqrt(pvar(w = GMVP_const.x, S = S) * 250)
-MSRP_const_ER =  pret(w = MSRP_const.x, ER = ER) * 250
-MSRP_const_VAR = m.sqrt(pvar(w = MSRP_const.x, S = S) * 250)
-
-#simulate minimum varaince frontier by minimizing the negative of the expected portfolio return
-#given a deterministic variance and the same restrictions as above.
-#we loop over an array of variances and can thus numerically get the MVF
-def pret_sim(w, ER):
-    return (-(w.T @ ER))
-
-#variances to loop over
-a = np.arange(0.1, 0.6, 0.01)
-bounds = Bounds(-0.2, 0.2)
-
-#initialize lists to store results in
-MVF_var_const = []
-MVF_ret_const = []
-
-#loop over variances and maximize expected return given that portfolio variance = given variance
-for i in a:
-    max_var = i
-    cons = ({"type": "eq", "fun" : lambda x: np.sum(x) - 1},
-            {"type": "eq", "fun" : lambda x: m.sqrt((x.T @ S @ x)* 250) - max_var},
-            {"type": "ineq", "fun": lambda x: -min_weight - x[10:20]},
-            {"type": "ineq", "fun": lambda x: x[0:10] - min_weight})
-
-    maximized = minimize(pret_sim, x0, method='SLSQP', args= ER,
-                         options={'disp': True, 'ftol': 1e-9},
-                         constraints=cons, bounds = bounds)
-
-    #only store result if optimization was successful!
-    if maximized.success:
-        MVF_var_const.append(i)
-        MVF_ret_const.append(maximized.fun * -250)
-    else:
-        continue
-
-#simulate random constrained portfolios
-#we simulate random portfolios which fulfil all restrictions by minimzing a "random" function which uses a random
-#array and the modulus to generate different portfolios
-#----------------------------------------------------------------------------------------
-
-random_portfolio = []
-
-def rand_funct(x,y):
-    return ((x % y)/y).sum()
-
-cons = ({"type": "eq", "fun" : lambda x: np.sum(x) - 1},
-        {"type": "ineq", "fun": lambda x: -min_weight - x[10:20]},
-        {"type": "ineq", "fun": lambda x: x[0:10] - min_weight})
-
-i = 0
-while i < 60:
-    y = np.random.uniform(low= 0, high=1, size=20)
-    MSRP_sim = minimize(rand_funct, x0, method='SLSQP', args= y,
-                        constraints=cons, options={'disp': True, 'ftol': 1e-9},
-                        bounds = bounds)
-    i = i + 1
-
-    #only store successful optimizations
-    if MSRP_sim.success:
-        random_portfolio.append(MSRP_sim.x)
-    else:
-        continue
-
-MVF_randvar_const = []
-MVF_randret_const = []
-
-#calculate return and variance (yearly) from calculated "random" portfolios
-for i in range(len(random_portfolio)):
-    exp_return = pret(w = random_portfolio[i], ER = ER)
-    exp_var = pvar(w = random_portfolio[i], S = S)
-    exp_return_year = exp_return * 250
-    exp_var_year = m.sqrt(exp_var * 250)
-
-    MVF_randvar_const.append(exp_var_year)
-    MVF_randret_const.append(exp_return_year)
-
-
-#plot results
-MVF_var_const.insert(0, GMVP_const_VAR)
-MVF_ret_const.insert(0, GMVP_const_ER)
-CAL_x = np.linspace(0, MSRP_const_VAR + 0.2, 50, endpoint=True)
-SR_MSRP = MSRP_const_ER / MSRP_const_VAR
-CAL_y = 0 + SR_MSRP*CAL_x
-
-frontier_points = pd.DataFrame({"variance": MVF_var_const, "return": MVF_ret_const})
-
-max_ret_index = frontier_points["return"].idxmax()
-
-#plot part that goes down again grey!
-plt.figure(figsize=(15, 10))
-plt.plot(frontier_points.variance.iloc[0:max_ret_index + 1], frontier_points["return"].iloc[0:max_ret_index + 1])
-plt.plot(frontier_points.variance.iloc[max_ret_index: len(frontier_points)],
-         frontier_points["return"].iloc[max_ret_index: len(frontier_points)], color = "grey", ls =  "--")
-
-plt.scatter(MVF_randvar_const, MVF_randret_const)
-plt.scatter(GMVP_const_VAR, GMVP_const_ER, s = 70)
-plt.scatter(MSRP_const_VAR, MSRP_const_ER, s = 70)
-plt.plot(CAL_x, CAL_y)
-plt.xlim([0,0.4])
-plt.ylim([0,0.3])
-plt.title("Minimum Variance Frontier Simulated", size = 22)
-plt.xlabel("Volatility", size = 12)
-plt.ylabel("Return", size = 12)
-plt.legend(["Minimum Variance Frontier", "?", "Capital Allocation Line","random portfolios", "GMVP", "MSRP"],
-           prop={'size': 10})
-plt.savefig("minimumvariancefrontier.png")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#calculate change of correlation  matrix in and out of sample
-out_sample_cor = Stock_Prices[Stock_Prices.index > end_backtesting].pct_change().corr()
-in_sample_cor =  Stock_Prices[Stock_Prices.index < end_backtesting].pct_change().corr()
-
-rel_cor = out_sample_cor / in_sample_cor
-pd.DataFrame(rel_cor).to_csv("files/correlation_change.csv")

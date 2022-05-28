@@ -19,7 +19,7 @@ We caltulate the optimal weights by calculating the Maximum Sharp Ratio Portfoli
 - our out of sample period is: start of 2022 - 24.05.2022
 
 ## Results 
-Results: 
+The table shows the selected stocks in the strategy as well as the weights allocated in our strategy and the weights that would have been used had we not implemented resrictions on the % value of money which can be inveted in a single stock.  
 
 <center>
   <img src="plots/selected_portfolio_characteristics.png" alt="drawing" width="800"/>
@@ -28,9 +28,15 @@ Results:
 
 ## Portfolio Characteristics
 
+Our strategy significantly outperforms the benchmark in the in-sample as well as out-sample period. Further, most of the risk - return metrics are superior for the strategy as compared to the benchmark.
+
 <p float="left">
-  <img src="/img1.png" width="100" />
-  <img src="/img2.png" width="100" /> 
-  <img src="/img3.png" width="100" />
+  <img src="plots/insample_performance.png" width="300" />
+  <img src="plots/outofsample_performance.png" width="300" /> 
+</p>
+
+<p float="left">
+  <img src="plots/risk_factors_in.png" width="300" />
+  <img src="plots/risk_factors_out.png" width="300" /> 
 </p>
 

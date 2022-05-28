@@ -5,7 +5,7 @@ by optimization. Then, we calculate the in and out of sample returns
 for the strategy and the chosen benchmark.
 Ultimately, we calculate performance and risk ratios and plot portfolio
 characteristics of the investment strategy in comparison to the benchmark.
-"""
+ """
 
 #load libraries
 import yfinance as yf
@@ -372,7 +372,7 @@ def yearly_vol(price, days, pct = True):
 #period = period of returns for which regression should be run (eg. "1Y", "1M", "1d")
 #kwargs = optional where only alpha, beta, x or y can be returned form function (param!)
 
-def alpha_beta(strategy, benchmark, period, **kwargs):
+def alpha_beta(strategy, benchmark, period, pct = True, **kwargs):
 
     daily_ret_strategy = strategy.pct_change().fillna(0) + 1
     daily_ret_BM = benchmark.pct_change().fillna(0) + 1
@@ -383,8 +383,12 @@ def alpha_beta(strategy, benchmark, period, **kwargs):
     model = LinearRegression().fit(period_ret_BM.to_numpy().reshape((-1,1)),
                                     period_ret_strategy.to_numpy().reshape((-1,1)))
 
-    beta = round(model.coef_[0][0],2)
-    alpha = to_pct(model.intercept_[0],2)
+    beta = model.coef_[0][0]
+
+    if pct:
+        alpha = to_pct(model.intercept_[0],2)
+    else:
+        alpha = model.intercept_[0]
 
     results = {"alpha": alpha,
                "beta": beta,
@@ -466,24 +470,49 @@ ratios_strategy_in = {"Avg. Yearly Return": nday_ret(strategy_in, N = 250),
                "Avg. Yearly Sharp Ratio": sharp_ratio(strategy_in, days = 250, rf_rate = 0),
                "Max. Drawdown": maxdd(strategy_in, "5d"),
                "Alpha (monthly Returns)": alpha_beta(strategy_in, BM_in, "1M", param = "alpha"),
-               "Beta (monthly Returns)": alpha_beta(strategy_in, BM_in, "1M", param = "beta"),
+               "Beta (monthly Returns)": round(alpha_beta(strategy_in, BM_in, "1M", param = "beta"),2),
                "Avg. Ann. Vol": yearly_vol(strategy_in, days = 250),
                "5d 99% VAR": NDAYVar(strategy_in, N = 5)}
 
 ratios_strategy_out = {"Return YTD": nday_ret(strategy_out, TR = True),
                 "Avg. Yearly Sharp Ratio": sharp_ratio(strategy_out, days = 250, rf_rate = 0),
                 "Max. Drawdown": maxdd(strategy_out, "5d"),
-                "Alpha (weekly Returns)": alpha_beta(strategy_out, BM_out, "5d", param = "alpha"),
-                "Beta (weekly Returns)": alpha_beta(strategy_out, BM_out, "5d", param = "beta"),
+                "Alpha (weekly Returns)": alpha_beta(strategy_out, BM_out, "1W", param = "alpha"),
+                "Beta (weekly Returns)": round(alpha_beta(strategy_out, BM_out, "1W", param = "beta"),2),
                 "Avg. Ann. Vol": yearly_vol(strategy_out, days = 250),
                 "5d 99% VAR": NDAYVar(strategy_out, N = 5)}
 
-#combine to data frames and export as png file for presentation
 risk_factors_out = pd.DataFrame({"Benchmark": ratios_BM_in, "Strategy": ratios_strategy_in})
 risk_factors_in = pd.DataFrame({"Benchmark": ratios_BM_out, "Strategy": ratios_strategy_out})
 
 dfi.export(risk_factors_out, "plots/risk_factors_out.png")
 dfi.export(risk_factors_in, "plots/risk_factors_in.png")
+#---------------------------------------------------------------------------
+        #Plot Visual Example for in Sample Alpha/ Beta Calculation
+#---------------------------------------------------------------------------
+#plot regression line
+
+params = alpha_beta(strategy_in, BM_in, period = "1M", pct = False)
+x = np.arange(min(params.get("x"))-0.1, max(params.get("x"))+0.1, 0.01)
+fitted_y = params.get("alpha") + params.get("beta") * x
+
+#assemble plot
+fig, ax = plt.subplots(figsize = (15,10))
+plt.scatter(params.get("x"), params.get("y"))
+plt.plot(x, fitted_y)
+plt.plot(x, x)
+plt.title("Monthly Returns Strategy vs. Benchmark (in sample)", size = 25)
+ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+ax.xaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+plt.ylabel("Monthly Returns Strategy", size = 15)
+plt.xlabel("Monthly Returns Benchmark", size = 15)
+plt.axhline(0, color = "black", ls = "--", lw = 1)
+plt.axvline(0, color = "black", ls =  "--", lw = 1)
+plt.xticks(size = 15)
+plt.yticks(size = 15)
+plt.legend(["liner fit", "x = y"], prop = {"size": 15})
+plt.savefig("plots/in_sample_alphabetaplot.png")
+
 
 #############################################################################
 #                                                                           #

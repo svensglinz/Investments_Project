@@ -1,3 +1,17 @@
+"""
+The following script has 4 main sections.
+We first calculate the optimal investment weights of a trading strategy
+by optimization. Then, we calculate the in and out of sample returns
+for the strategy and the chosen benchmark.
+Ultimately, we calculate performance and risk ratios and plot portfolio
+characteristics of the investment strategy in comparison to the benchmark.
+
+Team Members:
+- Kai Brüning
+- Shreya Bechra
+- Sven Glinz
+- Vanessa Stefan
+ """
 
 #load libraries
 import yfinance as yf
@@ -71,15 +85,20 @@ def pret(w, ER):
 def sharpe(w ,ER, S):
     return -(w.T @ ER)/ ((w.T @ S @ w) ** 0.5)
 
-#calculate optimized portfolios
+
+# ---------------------------------------------------------------------------
+# Calculate Optimized Portfolio
+# ---------------------------------------------------------------------------
 N = len(ER)
 x0 = np.ones(N)/N
 
-#set up constraints
-#first contraint -> total investment = 100% long
-#second constraint- > Values smaller than - min_weight (shocks which are shorted)
-#third constraint -> Values larger than min_weight (stock which are longed)
-#bounds = maximum long and short % for stocks
+"""
+set up constraints
+first constraint -> total investment = 100% long
+second constraint- > Values smaller than - min_weight (shocks which are shorted)
+third constraint -> Values larger than min_weight (stock which are longed)
+bounds = maximum long and short % for stocks
+"""
 
 min_weight = 0.02
 
@@ -115,15 +134,24 @@ dfi.export(stocks_invest, "plots/selected_portfolio_characteristics.png")
                   #Visualize efficient Frontier
 #---------------------------------------------------------------------------
 
+"""
+Generate efficient frontier plot by doing the following: 
+1. Minimize the negative value of the expected portfolio return 
+given a deterministic variance and the same rules as above (eg. min 2% in each stock)
+as restrictions in the optimization. --> We thus retrieve the maximum return given 
+all restrictions for a given variance. 
+
+2. We construct "random portfolios" which fulfill all the restrictions by minimizing a function
+which consists of a random array and a modulus operation which should randomize the optimization 
+results. We can then calculate the expected return and variance of these portfolios and add them 
+to the plot.
+"""
 #calculate volatility and expected return of GMVP and MSRP constrained
 GMVP_const_ER = pret(w = GMVP_const.x, ER = ER) * 250
 GMVP_const_VAR = m.sqrt(pvar(w = GMVP_const.x, S = S) * 250)
 MSRP_const_ER =  pret(w = MSRP_const.x, ER = ER) * 250
 MSRP_const_VAR = m.sqrt(pvar(w = MSRP_const.x, S = S) * 250)
 
-#simulate minimum varaince frontier by minimizing the negative of the expected portfolio return
-#given a deterministic variance and the same restrictions as above.
-#we loop over an array of variances and can thus numerically get the MVF
 def pret_sim(w, ER):
     return (-(w.T @ ER))
 
@@ -155,9 +183,6 @@ for i in a:
         continue
 
 #simulate random constrained portfolios
-#we simulate random portfolios which fulfil all restrictions by minimzing a "random" function which uses a random
-#array and the modulus to generate different portfolios
-
 random_portfolio = []
 
 def rand_funct(x,y):
@@ -247,7 +272,6 @@ def indexed_performance(start, prices, weights, end = None):
     temp.iloc[0] = weights
 
     #take cumulative return of each stock * initial investment (weight) and sum up horizontaly
-    #to get total value of strategy
     temp = temp.cumprod().sum(axis = 1)
     return(temp)
 
@@ -418,6 +442,7 @@ BM_out = out_sample["benchmark_gross"]
 strategy_in = in_sample["strategy_gross"]
 strategy_out = out_sample["strategy_gross"]
 
+#assemble dicts with risk return metrics
 BM_in = {"Avg. Yearly Return": nday_ret(BM_in, N = 250),
          "Avg. Yearly Sharp Ratio": sharp_ratio(BM_in, days = 250, rf_rate = 0),
          "Max. Drawdown": maxdd(BM_in, "5d"),
@@ -450,10 +475,10 @@ strategy_out = {"Return YTD": nday_ret(strategy_out, N = 250),
                 "Avg. Ann. Vol": yearly_vol(strategy_out, days = 250),
                 "5d 99% VAR": NDAYVar(strategy_out, N = "5d")}
 
+#combine to data frames and export as png file for presentation
 risk_factors_out = pd.DataFrame({"Benchmark": BM_in, "Strategy": strategy_in})
 risk_factors_in = pd.DataFrame({"Benchmark": BM_out, "Strategy": strategy_out})
 
-#export the two data frames with all risk factors included
 dfi.export(risk_factors_out, "plots/risk_factors_out.png")
 dfi.export(risk_factors_in, "plots/risk_factors_in.png")
 

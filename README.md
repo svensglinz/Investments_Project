@@ -31,8 +31,8 @@ The table shows the selected stocks in the strategy as well as the weights alloc
 Our strategy significantly outperforms the benchmark in the in-sample as well as out-sample period. Further, most of the risk - return metrics are superior for the strategy as compared to the benchmark.
 
 <p float="left">
-  <img src="plots/insample_performance.png" width="300" />
-  <img src="plots/outofsample_performance.png" width="300" /> 
+  <img src="plots/insample_performance.png" width="400" />
+  <img src="plots/outofsample_performance.png" width="400" /> 
 </p>
 
 <p float="left">

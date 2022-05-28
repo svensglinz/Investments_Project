@@ -36,7 +36,7 @@ Our strategy significantly outperforms the benchmark in the in-sample as well as
 </p>
 
 <p float="left">
-  <img src="plots/risk_factors_in.png" width="300" />
-  <img src="plots/risk_factors_out.png" width="300" /> 
+  <img src="plots/risk_factors_out.png" width="300" />
+  <img src="plots/risk_factors_in.png" width="300" /> 
 </p>
 

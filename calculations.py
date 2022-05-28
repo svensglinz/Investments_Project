@@ -5,13 +5,7 @@ by optimization. Then, we calculate the in and out of sample returns
 for the strategy and the chosen benchmark.
 Ultimately, we calculate performance and risk ratios and plot portfolio
 characteristics of the investment strategy in comparison to the benchmark.
-
-Team Members:
-- Kai Brüning
-- Shreya Bechra
-- Sven Glinz
-- Vanessa Stefan
- """
+"""
 
 #load libraries
 import yfinance as yf
@@ -50,11 +44,13 @@ Gross_Price.index = pd.to_datetime(Gross_Price.index)
 Net_Price.index = pd.to_datetime(Net_Price.index)
 benchmark.index = pd.to_datetime(benchmark.index)
 
-#Select stocks which the strategy invests in
-#our strategy goes long in the top 10 highest dividend stocks and short in the
-#top 10 lowest dividend stocks --> We select these stocks as our investmnet stocks
+"""
+Select stocks which the strategy invests in
+our strategy goes long in the top 10 highest dividend stocks and short in the
+top 10 lowest dividend stocks --> We select these stocks as our investmnet stocks
+drop BHP stock for which dividends have not been calculated correctly!
+"""
 
-#drop BHP stock for which dividends have not been calculated correctly!
 stocks_index = stocks_index.sort_values(by = "Yield", ascending= False)
 stocks_index = stocks_index.drop("BHP.L")
 stocks_invest = stocks_index.iloc[np.r_[0:10, 39:49]]
@@ -66,8 +62,8 @@ Net_Price_selected = Net_Price[stocks_invest.index]
 #############################################################################
 #                                                                           #
 #                                #SECTION 2                                 #
-#     Calculate Optimal Strategy stock weights with various constraints,
-#     and visualize optimization                                            #
+#     Calculate Optimal Strategy stock weights with various constraints     #
+#                       and visualize optimization                          #
 #                                                                           #
 #############################################################################
 
@@ -93,7 +89,7 @@ N = len(ER)
 x0 = np.ones(N)/N
 
 """
-set up constraints
+#set up constraints
 first constraint -> total investment = 100% long
 second constraint- > Values smaller than - min_weight (shocks which are shorted)
 third constraint -> Values larger than min_weight (stock which are longed)
@@ -146,17 +142,18 @@ which consists of a random array and a modulus operation which should randomize 
 results. We can then calculate the expected return and variance of these portfolios and add them 
 to the plot.
 """
-#calculate volatility and expected return of GMVP and MSRP constrained
+#calculate volatility and expected return of GMVP and MSRP constrained for plotting further below
 GMVP_const_ER = pret(w = GMVP_const.x, ER = ER) * 250
 GMVP_const_VAR = m.sqrt(pvar(w = GMVP_const.x, S = S) * 250)
 MSRP_const_ER =  pret(w = MSRP_const.x, ER = ER) * 250
 MSRP_const_VAR = m.sqrt(pvar(w = MSRP_const.x, S = S) * 250)
 
+#define negative portfolio return function
 def pret_sim(w, ER):
     return (-(w.T @ ER))
 
 #variances to loop over
-a = np.arange(0.1, 0.6, 0.01)
+var_list = np.arange(0.1, 0.6, 0.01)
 bounds = Bounds(-0.2, 0.2)
 
 #initialize lists to store results in
@@ -164,7 +161,7 @@ MVF_var_const = []
 MVF_ret_const = []
 
 #loop over variances and maximize expected return given that portfolio variance = given variance
-for i in a:
+for i in var_list:
     max_var = i
     cons = ({"type": "eq", "fun" : lambda x: np.sum(x) - 1},
             {"type": "eq", "fun" : lambda x: m.sqrt((x.T @ S @ x)* 250) - max_var},
@@ -182,19 +179,25 @@ for i in a:
     else:
         continue
 
-#simulate random constrained portfolios
+#---------------------------------------------------------------------------
+                  #Visualize efficient Frontier
+#---------------------------------------------------------------------------
+
 random_portfolio = []
 
+#"random" function which when optimized gives "random" portfolios
 def rand_funct(x,y):
     return ((x % y)/y).sum()
 
+#weight constraints of individual stocks
 cons = ({"type": "eq", "fun" : lambda x: np.sum(x) - 1},
         {"type": "ineq", "fun": lambda x: -min_weight - x[10:20]},
         {"type": "ineq", "fun": lambda x: x[0:10] - min_weight})
 
+#simulate 100 different portfolios which fulfill the constraints
 i = 0
 while i < 100:
-    y = np.random.uniform(low= 0, high=1, size=20)
+    y = np.random.uniform(low= 0, high=1, size=N)
     MSRP_sim = minimize(rand_funct, x0, method='SLSQP', args= y,
                         constraints=cons, options={'disp': True, 'ftol': 1e-9},
                         bounds = bounds)
@@ -229,29 +232,31 @@ CAL_y = 0 + SR_MSRP*CAL_x
 frontier_points = pd.DataFrame({"variance": MVF_var_const, "return": MVF_ret_const})
 max_ret_index = frontier_points["return"].idxmax()
 
-#plot part that goes down again grey!
-plt.figure(figsize=(15, 10))
+fig, ax = plt.subplots(figsize = (15,10))
 plt.plot(frontier_points.variance.iloc[0:max_ret_index + 1], frontier_points["return"].iloc[0:max_ret_index + 1])
 plt.plot(frontier_points.variance.iloc[max_ret_index: len(frontier_points)],
          frontier_points["return"].iloc[max_ret_index: len(frontier_points)], color = "grey", ls =  "--")
-
 plt.scatter(MVF_randvar_const, MVF_randret_const)
 plt.scatter(GMVP_const_VAR, GMVP_const_ER, s = 70)
 plt.scatter(MSRP_const_VAR, MSRP_const_ER, s = 70)
 plt.plot(CAL_x, CAL_y)
 plt.xlim([0,0.4])
-plt.ylim([0,0.3])
-plt.title("Minimum Variance Frontier Simulated", size = 22)
-plt.xlabel("Volatility", size = 12)
-plt.ylabel("Return", size = 12)
+plt.ylim([0,0.4])
+plt.title("Minimum Variance Frontier Simulated", size = 25)
+plt.xlabel("Volatility", size = 15)
+plt.ylabel("Return", size = 15)
 plt.legend(["Minimum Variance Frontier", "?", "Capital Allocation Line","random portfolios", "GMVP", "MSRP"],
            prop={'size': 10})
+ax.xaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+plt.xticks(size = 15)
+plt.yticks(size = 15)
 plt.savefig("minimumvariancefrontier.png")
 
 #############################################################################
 #                                                                           #
 #                                #SECTION 2                                 #
-#     Calculate  returns of     #
+#                           Calculate  returns of                           #
 #                 strategy and benchmark in and out of sample               #
 #                                                                           #
 #############################################################################
@@ -341,15 +346,12 @@ def to_pct(x, digits):
 #rf_rate = annualized risk free rate
 #prices for which ratio should be alculated
 
-def sharp_ratio(price, days, rf_rate, pct = True):
+def sharp_ratio(price, days, rf_rate):
     ER = price.pct_change().mean()
     SD = price.pct_change().std()
     SR = (ER-rf_rate/days)/SD * m.sqrt(days)
 
-    if pct:
-        return to_pct(SR, 2)
-    else:
-        return SR
+    return round(SR,2)
 
 #---------------------------------------------------------------------------
                         #Yearly volatility
@@ -381,11 +383,11 @@ def alpha_beta(strategy, benchmark, period, **kwargs):
     model = LinearRegression().fit(period_ret_BM.to_numpy().reshape((-1,1)),
                                     period_ret_strategy.to_numpy().reshape((-1,1)))
 
-    beta = model.coef_[0][0]
-    alpha = model.intercept_[0]
+    beta = round(model.coef_[0][0],2)
+    alpha = to_pct(model.intercept_[0],2)
 
-    results = {"alpha": to_pct(alpha,2),
-               "beta": round(beta,2),
+    results = {"alpha": alpha,
+               "beta": beta,
                "x": period_ret_BM.to_list(),
                "y": period_ret_strategy.to_list()}
 
@@ -410,10 +412,11 @@ def maxdd(price, pct = True):
                         #N Day unfiltered 99% VAR
 #---------------------------------------------------------------------------
 
-#N as string (ie. "1d", "5d", "1M"...)
+#N as number of days (integer)
 def NDAYVar(price, N, pct = True):
     daily_ret = price.pct_change().fillna(0) + 1
-    nday_ret = daily_ret.groupby(pd.Grouper(freq= N)).prod() - 1
+    daily_ret = daily_ret.reset_index(drop = True)
+    nday_ret = daily_ret.groupby(daily_ret.index // N).prod() - 1
     VAR = nday_ret.quantile(0.01)
 
     if pct:
@@ -443,41 +446,41 @@ strategy_in = in_sample["strategy_gross"]
 strategy_out = out_sample["strategy_gross"]
 
 #assemble dicts with risk return metrics
-BM_in = {"Avg. Yearly Return": nday_ret(BM_in, N = 250),
+ratios_BM_in = {"Avg. Yearly Return": nday_ret(BM_in, N = 250),
          "Avg. Yearly Sharp Ratio": sharp_ratio(BM_in, days = 250, rf_rate = 0),
          "Max. Drawdown": maxdd(BM_in, "5d"),
          "Alpha (monthly Returns)": "0%",
          "Beta (monthly Returns)": 1,
          "Avg. Ann. Vol": yearly_vol(BM_in, days = 250),
-         "5d 99% VAR": NDAYVar(BM_in, N = "5d")}
+         "5d 99% VAR": NDAYVar(BM_in, N = 5)}
 
-BM_out = {"Return YTD": nday_ret(BM_out, TR = True),
+ratios_BM_out = {"Return YTD": nday_ret(BM_out, TR = True),
          "Avg. Yearly Sharp Ratio": sharp_ratio(BM_out, days = 250, rf_rate = 0),
          "Max. Drawdown": maxdd(BM_out, "5d"),
          "Alpha (weekly Returns)": "0%",
          "Beta (weekly Returns)": 1,
          "Avg. Ann. Vol": yearly_vol(BM_out, days = 250),
-         "5d 99% VAR": NDAYVar(BM_out, N = "5d")}
+         "5d 99% VAR": NDAYVar(BM_out, N = 5)}
 
-strategy_in = {"Avg. Yearly Return": nday_ret(strategy_in, N = 250),
+ratios_strategy_in = {"Avg. Yearly Return": nday_ret(strategy_in, N = 250),
                "Avg. Yearly Sharp Ratio": sharp_ratio(strategy_in, days = 250, rf_rate = 0),
                "Max. Drawdown": maxdd(strategy_in, "5d"),
                "Alpha (monthly Returns)": alpha_beta(strategy_in, BM_in, "1M", param = "alpha"),
                "Beta (monthly Returns)": alpha_beta(strategy_in, BM_in, "1M", param = "beta"),
                "Avg. Ann. Vol": yearly_vol(strategy_in, days = 250),
-               "5d 99% VAR": NDAYVar(strategy_in, N = "5d")}
+               "5d 99% VAR": NDAYVar(strategy_in, N = 5)}
 
-strategy_out = {"Return YTD": nday_ret(strategy_out, N = 250),
+ratios_strategy_out = {"Return YTD": nday_ret(strategy_out, TR = True),
                 "Avg. Yearly Sharp Ratio": sharp_ratio(strategy_out, days = 250, rf_rate = 0),
                 "Max. Drawdown": maxdd(strategy_out, "5d"),
                 "Alpha (weekly Returns)": alpha_beta(strategy_out, BM_out, "5d", param = "alpha"),
                 "Beta (weekly Returns)": alpha_beta(strategy_out, BM_out, "5d", param = "beta"),
                 "Avg. Ann. Vol": yearly_vol(strategy_out, days = 250),
-                "5d 99% VAR": NDAYVar(strategy_out, N = "5d")}
+                "5d 99% VAR": NDAYVar(strategy_out, N = 5)}
 
 #combine to data frames and export as png file for presentation
-risk_factors_out = pd.DataFrame({"Benchmark": BM_in, "Strategy": strategy_in})
-risk_factors_in = pd.DataFrame({"Benchmark": BM_out, "Strategy": strategy_out})
+risk_factors_out = pd.DataFrame({"Benchmark": ratios_BM_in, "Strategy": ratios_strategy_in})
+risk_factors_in = pd.DataFrame({"Benchmark": ratios_BM_out, "Strategy": ratios_strategy_out})
 
 dfi.export(risk_factors_out, "plots/risk_factors_out.png")
 dfi.export(risk_factors_in, "plots/risk_factors_in.png")
@@ -528,7 +531,8 @@ plt.savefig("plots/excess_return_breakdown.png")
 
 fig = plt.figure(figsize=(15, 10))
 plt.plot(out_sample[["strategy_gross", "benchmark_gross"]])
-plt.legend(out_sample[["strategy_gross", "benchmark_gross"]].columns)
+plt.legend(out_sample[["strategy_gross", "benchmark_gross"]].columns,
+           prop = {"size": 15})
 plt.title("Out of Sample Strategy Performance (TR)", size = 20)
 plt.ylabel("Cumulative Return", size = 15)
 plt.yticks(size = 15)
@@ -538,16 +542,19 @@ plt.xticks(size = 15)
 plt.savefig("plots/outofsample_performance.png")
 
 #---------------------------------------------------------------------------
-        #In of Sample Gross Strategy vs Benchmark Performance
+        #In Sample Gross Strategy vs Benchmark Performance
 #---------------------------------------------------------------------------
 
 fig = plt.figure(figsize=(15, 10))
 plt.plot(in_sample[["strategy_gross", "benchmark_gross"]])
-plt.legend(in_sample[["strategy_gross", "benchmark_gross"]].columns)
-plt.title("In Sample Strategy Performance", size = 20)
+plt.legend(in_sample[["strategy_gross", "benchmark_gross"]].columns,
+           prop = {"size": 15})
+plt.title("In Sample Strategy Performance", size = 22)
 plt.ylabel("Cumulative Return")
 plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b-%Y'))
-plt.gca().xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+plt.gca().xaxis.set_major_locator(mdates.MonthLocator(interval=3))
+plt.xticks(size = 13)
+plt.yticks(size = 13)
 plt.savefig("plots/insample_performance.png")
 
 #---------------------------------------------------------------------------
@@ -560,10 +567,10 @@ plt.legend(in_sample[["strategy_gross", "strategy_net", "benchmark_gross", "benc
            prop = {"size": 15})
 plt.title("In Sample Strategy Performance (net and gross) Comparison", size = 22)
 plt.ylabel("Cumulative Return", size = 15)
-plt.yticks(size = 13)
 plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b-%Y'))
 plt.gca().xaxis.set_major_locator(mdates.MonthLocator(interval=3))
 plt.xticks(size = 13)
+plt.yticks(size = 13)
 plt.savefig("plots/insample_performance_netgross.png")
 
 #---------------------------------------------------------------------------
@@ -645,7 +652,7 @@ ax.legend(["Strategy", "Index"])
 plt.title("Currency Weights Strategy vs Index", size = 20)
 ax.xaxis.set_major_formatter(mtick.PercentFormatter(1.0))
 plt.yticks(size = 15)
-plt.xticks(size = 10)
+plt.xticks(size = 15)
 plt.savefig("plots/curency_comparison.png")
 
 #---------------------------------------------------------------------------
@@ -687,26 +694,35 @@ plt.plot(prices)
 plt.title("High Dividend Stocks vs. Technology Stocks vs. Total Market", size = 25)
 plt.legend(prices.columns,  prop={'size': 15})
 plt.ylabel("Cumulative Return", size = 15)
-plt.xlabel("Date")
 plt.xticks(size = 15)
 plt.yticks(size = 15)
+plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b-%Y'))
+plt.gca().xaxis.set_major_locator(mdates.MonthLocator(interval=1))
 plt.savefig("comparison.png")
 
-#calculate change of correlation  matrix in and out of sample
-out_sample_cor = Stock_Prices[Stock_Prices.index > end_backtesting].pct_change().corr()
-in_sample_cor =  Stock_Prices[Stock_Prices.index < end_backtesting].pct_change().corr()
+#---------------------------------------------------------------------------
+    #calculate change of correlation  matrix in vs out of sample
+#---------------------------------------------------------------------------
+
+out_sample_cor = Gross_Price[Gross_Price.index > end_backtesting].pct_change().corr()
+in_sample_cor =  Gross_Price[Gross_Price.index < end_backtesting].pct_change().corr()
 
 rel_cor = out_sample_cor / in_sample_cor
 pd.DataFrame(rel_cor).to_csv("files/correlation_change.csv")
 
+#---------------------------------------------------------------------------
+  #calculate performance ratios for short and long portfolios & Benchmark
+#---------------------------------------------------------------------------
 
-#calculate performance ratios for short and long portfolios
+"""
+we only include stocks which contain a forward,trailing PE ratio &
+PB Ratio to calculate weighted values. 
+Further, as described by iShares,
+we restrict the maximum value of PE ratios to 60 and of PB ratios to 25. 
+"""
 stocks_short = stocks_invest[stocks_invest.weights <0]
 stocks_long = stocks_invest[stocks_invest.weights > 0]
 
-#---------------------------------------------------------------------------
-    #Plot performance Nasdaq100 vs. MSCI World vs. FTSE AW-HighDivYield
-#---------------------------------------------------------------------------
 #dividend yield
 div_yield_long = (stocks_long.weights / stocks_long.weights.sum() * stocks_long.Yield).sum()
 div_yield_short = (stocks_short.weights.abs()/ stocks_short.weights.abs().sum() * stocks_short.Yield).sum()

@@ -1,3 +1,12 @@
+"""
+This file assembles a data frame which contains all stocks from the stoxx europe 50 index
+and includes various stock ratios such as PE7/ PB dividend yield etc.
+Further, we download the prices of all index constituents and the index itself
+and modify them to get the gross values (incl. dividends)
+We export all prices as csv files which can be used as inputs for the sript "calculation.py"
+"""
+
+
 #load libraries
 import yfinance as yf
 import pandas as pd
@@ -7,8 +16,10 @@ import time
 from yahoo_fin.stock_info import *
 import random
 
-#-----------------------------------------------------------------------
-#define parameters of investment period start
+############################################################################
+##define parameters of investment period start
+############################################################################
+
 start_backtesting = np.datetime64("2011-01-01")
 end_backtesting = np.datetime64("2021-12-31")
 
@@ -16,15 +27,19 @@ end_backtesting = np.datetime64("2021-12-31")
 end_dividends = np.datetime64("2021-12-31")
 start_dividends = end_dividends - np.timedelta64(365,'D')
 
-# Import benchmark and calculate net and gross values
-#-------------------------------------------------------------------------
 
-#ishares ETF on Stoxx Europe 50 used as benchmark (ETF is distributing --> paid out dividends were downloaded
-#separately and are stored in file "dividends_benchmark.csv" which is needed to calculate gross returns
-#with reinvested dividends)
+############################################################################
+# Import benchmark and calculate net and gross values
+############################################################################
+
+"""
+ishares ETF on Stoxx Europe 50 used as benchmark (ETF is distributing --> paid out dividends were downloaded
+separately and are stored in file "dividends_benchmark.csv" which is needed to calculate gross returns
+with reinvested dividends)
+"""
 
 benchmark = yf.download(tickers = "EUNA.AS", interval = "1d", start = start_backtesting, end = dt.date.today())
-benchmark_dividends = pd.read_csv("files/dividends_benchmark.csv")
+benchmark_dividends = pd.read_csv("dividends_benchmark.csv")
 benchmark_dividends.index = pd.to_datetime(benchmark_dividends.Date, format = "%d.%m.%Y")
 benchmark_dividends = benchmark_dividends.drop("Date", axis = 1)
 
@@ -44,15 +59,17 @@ benchmark_gross = pd.DataFrame({"Adj Close": benchmark_gross})
 benchmark = pd.DataFrame({"benchmark_gross": benchmark_gross["Adj Close"], "benchmark_net": benchmark_net["Adj Close"]},
                          index = benchmark_net.index)
 
-benchmark.to_csv("files/benchmark.csv")
+benchmark.to_csv("benchmark.csv")
 
 #--------------------------------------------------------------------------------------------------
-# Download ticker symbols for investment universe which is the stoxx europe 50 index.
-#as there are no ticker symbols available on the webpage do the following:
-#1: download names of index constituents form wikipedia
-#2: download names and ticker of euro stoxx 50 from wikipedia
-#3: join the two since many constituents are overlapping
-#4 check which tickers are still missing and manually complete them!
+"""
+Download ticker symbols for investment universe which is the stoxx europe 50 index.
+as there are no ticker symbols available on the webpage do the following:
+1: download names of index constituents form wikipedia
+2: download names and ticker of euro stoxx 50 from wikipedia
+3: join the two since many constituents are overlapping
+4 check which tickers are still missing and manually complete them!
+"""
 
 #Retreive Stoxx Europe 50 Data
 page_StoxxEurope = pd.read_html("https://de.wikipedia.org/wiki/STOXX_Europe_50")
@@ -82,8 +99,9 @@ Tickers_StoxxEurope = StoxxEurope_table.merge(all_tickers, on = "Name", how = "l
 
 Stock_Tickers = Tickers_StoxxEurope.Ticker.to_list()
 
+############################################################################
 #retrive financial ratios and calculate one year dividend yield as of end-backtesting date for all index tickers
-#----------------------------------------------------------------------------
+############################################################################
 
 #initilize empty lists to store results
 ticker_list = []
@@ -96,20 +114,21 @@ trailing_pe_list = []
 country_list = []
 dividend_dict = {}
 
-#unfortunately accessing yfinance via api (yfinance package) does not always
-#return dividends or ratio information even if they exist
-#thus, for ratios and dividends we rely on yahoo_fin module which is much more reliable
-#however, since it scrapes the data directly from the website and yahoo has very strict
-#rate limits, we pause the loop for 100 seconds after the website returns that we cannot
-#fetch any more data
-
-#if limit is reached, indexerror is raised for dividends
-#if limit is reached, data frame with nan is produced for ratios -> We manually raise an index error to indicate
-#that the rate limit has been reached
-#-----------------------------------------------------------------------------
+"""
+unfortunately accessing yfinance via api (yfinance package) does not always
+return dividends or ratio information even if they exist.
+Thus, for ratios and dividends we rely on yahoo_fin module which is much more reliable.
+However, since it scrapes the data directly from the website and yahoo has very strict
+rate limits, we pause the loop for a random time(between 30 & 80 seconds) after the website returns that we cannot
+fetch any more data.
+We notice that we are blocked by the website if: 
+dividend data frame comes back empty --> indexerror is raised by loop 
+ratios data frame with nan is produced for ratios -> We manually raise an index error to indicate
+that the rate limit has been reached
+"""
 
 i = 0
-while i in range(len(Stock_Tickers[40:49])):
+while i in range(len(Stock_Tickers)):
 
     try:
         ticker = yf.Ticker(Stock_Tickers[i])
@@ -152,7 +171,7 @@ while i in range(len(Stock_Tickers[40:49])):
         #print progress of loop
         print("import of " + Stock_Tickers[i] + " successful")
         i = i + 1
-        time.sleep(random.randint(3,10))
+        time.sleep(random.randint(3,15))
 
     #loop is paused after rate limit has been reached
     except IndexError:
@@ -167,10 +186,15 @@ stocks = pd.DataFrame({"Name": list(Tickers_StoxxEurope["Name"]), "Currency": cu
                        "Trailing_PE": trailing_pe_list, "PB_Ratio": pb_list},
                        index = Stock_Tickers)
 
+"""
 #to compare our strategy with that of the index, we also manually add the weights
-#as found on the ishares website to it (per 31. December 2021). #4 members have been replaced since (
-#Vodafone, Safran, National Grid, BHP, for each, the weight of its replacement is taken. The Impact of this is expected to be
-#very minor
+as found on the ishares website to it (per 31. December 2021). 
+4 index members have been replaced since and thus there is a difference between the ishares data
+and our index constituents (Vodafone, Safran, National Grid, BHP)
+for each, the weight of its replacement is taken. The Impact of this is expected to be very minor as 
+all weights are < 2%
+"""
+
 stocks_indexweights = np.array([1.19, 0.99, 1.36, 1.52, 1.37, 1.77, 0.99, 6.12,
                                 3.35, 1.13, 1.19, 0.96, 1.16, 1.47, 1.63, 1.44, 1.18, 1.18, 2.34,
                                 1.14, 2.02, 2.31, 1.27, 0.87, 1.08, 2.12, 3.27, 4.01, 1.1, 7.25, 3.95, 3.43, 1.34, 0.87, 1.16,
@@ -180,10 +204,11 @@ stocks_indexweights = np.array([1.19, 0.99, 1.36, 1.52, 1.37, 1.77, 0.99, 6.12,
 stocks["index_weights"] = stocks_indexweights
 
 #write data to CSV
-stocks.to_csv("files/index_constituents_data.csv")
+stocks.to_csv("index_constituents_data.csv")
 
+############################################################################
 #Download Prices of Benchmark constituents and Exchange Rates to convert all Prices to EUR
-#-----------------------------------------------------------------------------------------
+############################################################################
 
 Net_Price = yf.download(tickers = list(stocks.index), start = start_backtesting, end = dt.date.today(), interval = "1d")
 Net_Price = Net_Price["Adj Close"]
@@ -200,6 +225,10 @@ e_rates = e_rates.rename(columns= {"CHFEUR=X": "CHF", "DKKEUR=X": "DKK", "GBPEUR
 Net_Price = Net_Price.fillna(0)
 Net_Price = pd.DataFrame(Net_Price).fillna(method = "ffill")
 Net_Price = Net_Price.loc[np.all(Net_Price != 0, axis = 1)]
+
+############################################################################
+#Calculate Gross Stock Prices
+############################################################################
 
 Gross_Price = pd.DataFrame()
 
@@ -221,6 +250,9 @@ for i in Net_Price.columns:
 
     Gross_Price[i] = temp
 
+#export gross prices in local currency as csv
+Gross_Price.to_csv("Gross_Prices_localccy.csv")
+
 #convert all prices to EUR!!! (gross and net)
 adj_prices_gross = Gross_Price.join(e_rates)
 adj_prices_net = Net_Price.join(e_rates)
@@ -230,18 +262,18 @@ for i in currencies:
 
     #for stocks quoted in pence (100th of a Pound)
     if i == "GBp":
-        adj_prices_gross[tickers] = adj_prices_gross[tickers] * (adj_prices_gross["GBP"] / 100)
-        adj_prices_net[tickers] = adj_prices_net[tickers] * (adj_prices_net["GBP"] / 100)
+        adj_prices_gross[tickers] = adj_prices_gross[tickers].multiply((adj_prices_gross["GBP"] / 100), axis = 0)
+        adj_prices_net[tickers] = adj_prices_net[tickers].multiply((adj_prices_net["GBP"] / 100), axis = 0)
     elif i == "EUR":
         pass
     else:
-        adj_prices_gross[tickers] = adj_prices_gross[tickers] * adj_prices_gross[i]
-        adj_prices_net[tickers] = adj_prices_net[tickers] * adj_prices_net[i]
+        adj_prices_gross[tickers] = adj_prices_gross[tickers].multiply(adj_prices_gross[i], axis = 0)
+        adj_prices_net[tickers] = adj_prices_net[tickers].multiply(adj_prices_net[i], axis = 0)
 
 #delete exchange rates again
 adj_prices_net = adj_prices_net[Gross_Price.columns]
 adj_prices_gross = adj_prices_gross[Gross_Price.columns]
 
 #write to csv files
-adj_prices_net.to_csv("files/Net_Prices_EUR.csv")
-adj_prices_gross.to_csv("files/Gross_Prices_EUR.csv")
+adj_prices_net.to_csv("Net_Prices_EUR.csv")
+adj_prices_gross.to_csv("Gross_Prices_EUR.csv")

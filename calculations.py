@@ -20,6 +20,8 @@ from scipy.optimize import Bounds
 import datetime as dt
 from sklearn.linear_model import LinearRegression
 import dataframe_image as dfi
+import pdfkit as pdf
+import sqlite3
 
 #############################################################################
 #                                                                           #
@@ -127,7 +129,8 @@ MSRP_unconst = minimize(sharpe, x0, method='SLSQP', args=(ER,S), constraints = c
 #complete data set of selected stocks with calculated constrained MSRP values & export for presentation
 stocks_invest["weights"] = MSRP_const.x
 stocks_invest["weights_unconst"] = MSRP_unconst.x
-dfi.export(stocks_invest, "plots/selected_portfolio_characteristics.png")
+# dfi.export(stocks_invest, "plots/selected_portfolio_characteristics.png")
+stocks_invest.to_html("plots/selected_portfolio_characteristic.html")
 
 #---------------------------------------------------------------------------
                   #Visualize efficient Frontier
@@ -499,8 +502,10 @@ ratios_strategy_out = {"Return YTD": nday_ret(strategy_out, TR = True),
 risk_factors_in = pd.DataFrame({"Benchmark": ratios_BM_in, "Strategy": ratios_strategy_in})
 risk_factors_out = pd.DataFrame({"Benchmark": ratios_BM_out, "Strategy": ratios_strategy_out})
 
-dfi.export(risk_factors_out, "plots/risk_factors_out.png")
-dfi.export(risk_factors_in, "plots/risk_factors_in.png")
+# dfi.export(risk_factors_out, "plots/risk_factors_out.png")
+risk_factors_out.to_html("plots/risk_factors_out.html")
+# dfi.export(risk_factors_in, "plots/risk_factors_in.png")
+risk_factors_in.to_html("plots/risk_factors_in.html")
 
 #---------------------------------------------------------------------------
         #Plot Visual Example for in Sample Alpha/ Beta Calculation
@@ -824,4 +829,5 @@ ratios_index = {"Yield": to_pct(div_yield_index,2),
 ratios_table = pd.DataFrame({"Portfolio Short":ratios_short, "Portfolio Long": ratios_long, "Index": ratios_index})
 
 #export table
-dfi.export(ratios_table, "plots/portfolio_characteristics.png")
+# dfi.export(ratios_table, "plots/portfolio_characteristics.png")
+ratios_table.to_html("plots/portfolio_characteristics.html")

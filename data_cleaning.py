@@ -21,6 +21,7 @@ import random
 
 start_backtesting = np.datetime64("2011-01-01")
 end_backtesting = np.datetime64("2021-12-31")
+end_out_sample = np.datetime64("2022-05-21")
 
 #define end backtesting - one year as interval to calculate one year dividend yield
 end_dividends = np.datetime64("2021-12-31")
@@ -37,7 +38,7 @@ separately and are stored in file "dividends_benchmark.csv" which is needed to c
 with reinvested dividends)
 """
 
-benchmark = yf.download(tickers = "EUNA.AS", interval = "1d", start = start_backtesting, end = dt.date.today())
+benchmark = yf.download(tickers = "EUNA.AS", interval = "1d", start = start_backtesting, end = end_out_sample)
 benchmark_dividends = pd.read_csv("files/dividends_benchmark.csv")
 benchmark_dividends.index = pd.to_datetime(benchmark_dividends.Date, format = "%d.%m.%Y")
 benchmark_dividends = benchmark_dividends.drop("Date", axis = 1)
@@ -222,14 +223,14 @@ If you chose not to run the loop anove, run the below code to continue
 #Download Prices of Benchmark constituents and Exchange Rates to convert all Prices to EUR
 ############################################################################
 
-Net_Price = yf.download(tickers = list(stocks.index), start = start_backtesting, end = dt.date.today(), interval = "1d")
+Net_Price = yf.download(tickers = list(stocks.index), start = start_backtesting, end = end_out_sample, interval = "1d")
 Net_Price = Net_Price["Adj Close"]
 
 #get unique currencies of stocks
 currencies = stocks.Currency.unique()
 
 #download exchange rates against eur of all currencies which are represented in the index
-e_rates = yf.download(tickers = ["CHFEUR=X", "DKKEUR=X", "GBPEUR=X"], start = start_backtesting, end = dt.date.today(), interval = "1d")
+e_rates = yf.download(tickers = ["CHFEUR=X", "DKKEUR=X", "GBPEUR=X"], start = start_backtesting, end = end_out_sample, interval = "1d")
 e_rates = e_rates["Adj Close"]
 e_rates = e_rates.rename(columns= {"CHFEUR=X": "CHF", "DKKEUR=X": "DKK", "GBPEUR=X": "GBP"})
 

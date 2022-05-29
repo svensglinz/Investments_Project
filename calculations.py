@@ -33,6 +33,7 @@ import dataframe_image as dfi
 #actual time could be shorter depending on availability of data!
 start_backtesting = np.datetime64("2011-01-01")
 end_backtesting = np.datetime64("2021-12-31")
+end_out_sample = np.datetime64("2022-05-21")
 
 #Import needed CSV files
 stocks_index = pd.read_csv("files/index_constituents_data.csv", index_col= 0)
@@ -727,7 +728,7 @@ plt.savefig("plots/sector_weights.png")
 #---------------------------------------------------------------------------
 
 #download prices and clean data
-prices = yf.download(tickers = ["VHYL.AS", "EXXT.DE", "IWDA.AS"], start = "2022-01-01", end = dt.date.today())
+prices = yf.download(tickers = ["VHYL.AS", "EXXT.DE", "IWDA.AS"], start = "2022-01-01", end = end_out_sample)
 prices = prices["Adj Close"]
 prices = prices.div(prices.iloc[0])
 prices = prices.rename(columns = {"EXXT.DE": "Nasdaq 100", "IWDA.AS": "MSCI World", "VHYL.AS": "FTSE All World High Dividend"})

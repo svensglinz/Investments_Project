@@ -1,4 +1,12 @@
-# Investments_Project
+## Description 
+
+This script was written for a group project for the Class Investments at NCCU. 
+Team Members: 
+
+-
+-
+-
+-
 
 ## Motivation
 

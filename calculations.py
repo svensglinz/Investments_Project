@@ -126,8 +126,8 @@ MSRP_unconst = minimize(sharpe, x0, method='SLSQP', args=(ER,S), constraints = c
 
 
 #complete data set of selected stocks with calculated constrained MSRP values & export for presentation
-stocks_invest["weights"] = MSRP_const.x
-stocks_invest["weights_unconst"] = MSRP_unconst.x
+stocks_invest = stocks_invest.assign(weights = MSRP_const.x)
+stocks_invest = stocks_invest.assign(weights_unconst = MSRP_unconst.x)
 dfi.export(stocks_invest, "plots/selected_portfolio_characteristics.png")
 
 #---------------------------------------------------------------------------

@@ -126,6 +126,14 @@ ratios data frame with nan is produced for ratios -> We manually raise an index 
 that the rate limit has been reached
 """
 
+"""
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+This loop can take quite a long time to complete!
+If you wish to skip this step, please continue below and just import the results 
+of this loop as a csv
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+"""
+
 i = 0
 while i in range(len(Stock_Tickers)):
 
@@ -204,6 +212,11 @@ stocks["index_weights"] = stocks_indexweights
 
 #write data to CSV
 stocks.to_csv("files/index_constituents_data.csv")
+
+"""
+If you chose not to run the loop anove, run the below code to continue
+--> CODE: stocks = pd.read_csv("files/index_constituents_data.csv)
+"""
 
 ############################################################################
 #Download Prices of Benchmark constituents and Exchange Rates to convert all Prices to EUR

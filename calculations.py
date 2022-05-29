@@ -748,8 +748,8 @@ plt.savefig("plots/comparison.png")
     #calculate change of correlation  matrix in vs out of sample
 #---------------------------------------------------------------------------
 
-out_sample_cor = Gross_Price[Gross_Price.index > end_backtesting].pct_change().corr()
-in_sample_cor =  Gross_Price[Gross_Price.index < end_backtesting].pct_change().corr()
+out_sample_cor = Gross_Price_selected[Gross_Price_selected.index > end_backtesting].pct_change().corr()
+in_sample_cor =  Gross_Price_selected[Gross_Price_selected.index < end_backtesting].pct_change().corr()
 
 rel_cor = out_sample_cor / in_sample_cor
 pd.DataFrame(rel_cor).to_csv("files/correlation_change.csv")

@@ -3,9 +3,8 @@ This file assembles a data frame which contains all stocks from the stoxx europe
 and includes various stock ratios such as PE7/ PB dividend yield etc.
 Further, we download the prices of all index constituents and the index itself
 and modify them to get the gross values (incl. dividends)
-We export all prices as csv files which can be used as inputs for the sript "calculation.py"
+We export all prices as csv files which can be used as inputs for the script "calculation.py"
 """
-
 
 #load libraries
 import yfinance as yf

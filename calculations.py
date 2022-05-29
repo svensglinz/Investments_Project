@@ -29,7 +29,8 @@ import dataframe_image as dfi
 #                                                                           #
 #############################################################################
 
-#define parameters of investment period start
+#define parameters of investment period start (start_backtesting as maximum time period!
+#actual time could be shorter depending on availability of data!
 start_backtesting = np.datetime64("2011-01-01")
 end_backtesting = np.datetime64("2021-12-31")
 
@@ -68,6 +69,8 @@ Net_Price_selected = Net_Price[stocks_invest.index]
 #############################################################################
 
 #estimate expected returns and var-cov matrix for optimization (with in sample data!)
+
+rf_daily = 0
 ER = Gross_Price_selected[Gross_Price_selected.index < end_backtesting].pct_change().mean()
 S = Gross_Price_selected[Gross_Price_selected.index < end_backtesting].pct_change().cov()
 
@@ -79,7 +82,7 @@ def pret(w, ER):
     return (w.T @ ER)
 
 def sharpe(w ,ER, S):
-    return -(w.T @ ER)/ ((w.T @ S @ w) ** 0.5)
+    return -(w.T @ (ER-rf_daily))/ ((w.T @ S @ w) ** 0.5)
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +134,7 @@ dfi.export(stocks_invest, "plots/selected_portfolio_characteristics.png")
 #---------------------------------------------------------------------------
 
 """
-Generate efficient frontier plot by doing the following: 
+Generate Minimum Variance Frontier / Investment Frontier plot by doing the following: 
 1. Minimize the negative value of the expected portfolio return 
 given a deterministic variance and the same rules as above (eg. min 2% in each stock)
 as restrictions in the optimization. --> We thus retrieve the maximum return given 
@@ -196,16 +199,18 @@ cons = ({"type": "eq", "fun" : lambda x: np.sum(x) - 1},
 
 #simulate 100 different portfolios which fulfill the constraints
 i = 0
+np.random.seed(0)
+
 while i < 100:
     y = np.random.uniform(low= 0, high=1, size=N)
-    MSRP_sim = minimize(rand_funct, x0, method='SLSQP', args= y,
+    portfolio_sim = minimize(rand_funct, x0, method='SLSQP', args= y,
                         constraints=cons, options={'disp': True, 'ftol': 1e-9},
                         bounds = bounds)
     i = i + 1
 
     #only store successful optimizations
-    if MSRP_sim.success:
-        random_portfolio.append(MSRP_sim.x)
+    if portfolio_sim.success:
+        random_portfolio.append(portfolio_sim.x)
     else:
         continue
 
@@ -242,16 +247,21 @@ plt.scatter(MSRP_const_VAR, MSRP_const_ER, s = 70)
 plt.plot(CAL_x, CAL_y)
 plt.xlim([0,0.4])
 plt.ylim([0,0.4])
-plt.title("Minimum Variance Frontier Simulated", size = 25)
+plt.title("Investment Frontier Simulated", size = 25)
 plt.xlabel("Volatility", size = 15)
 plt.ylabel("Return", size = 15)
-plt.legend(["Minimum Variance Frontier", "?", "Capital Allocation Line","random portfolios", "GMVP", "MSRP"],
-           prop={'size': 10})
+plt.legend(["Minimum Variance Frontier",
+            "Investment Frontier",
+            "Capital Allocation Line",
+            "random portfolios",
+            "GMVP",
+            "MSRP"],
+           prop={'size': 15})
 ax.xaxis.set_major_formatter(mtick.PercentFormatter(1.0))
 ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
 plt.xticks(size = 15)
 plt.yticks(size = 15)
-plt.savefig("minimumvariancefrontier.png")
+plt.savefig("plots/investmentfrontier.png")
 
 #############################################################################
 #                                                                           #
@@ -371,14 +381,16 @@ def yearly_vol(price, days, pct = True):
 
 #period = period of returns for which regression should be run (eg. "1Y", "1M", "1d")
 #kwargs = optional where only alpha, beta, x or y can be returned form function (param!)
+#rf_rate = risk free rate for the "period"
+def alpha_beta(strategy, benchmark, period, rf_period, pct = True, **kwargs):
 
-def alpha_beta(strategy, benchmark, period, pct = True, **kwargs):
 
     daily_ret_strategy = strategy.pct_change().fillna(0) + 1
     daily_ret_BM = benchmark.pct_change().fillna(0) + 1
 
-    period_ret_strategy = daily_ret_strategy.groupby(pd.Grouper(freq=period)).prod() - 1
-    period_ret_BM = daily_ret_BM.groupby(pd.Grouper(freq=period)).prod() -1
+    #calculate excess returns for the period over the risk free rate
+    period_ret_strategy = daily_ret_strategy.groupby(pd.Grouper(freq=period)).prod() - 1 - rf_period
+    period_ret_BM = daily_ret_BM.groupby(pd.Grouper(freq=period)).prod() -1 - rf_period
 
     model = LinearRegression().fit(period_ret_BM.to_numpy().reshape((-1,1)),
                                     period_ret_strategy.to_numpy().reshape((-1,1)))
@@ -405,7 +417,9 @@ def alpha_beta(strategy, benchmark, period, pct = True, **kwargs):
 #---------------------------------------------------------------------------
 
 def maxdd(price, pct = True):
-    maxdd = price.diff().cumsum().min()
+    #Value at time T divided by max value from time t = 0 to t = T (T> 0)
+    diffmax = price/ price.cummax()
+    maxdd = (diffmax -1).min()
 
     if pct:
         return to_pct(maxdd, 2)
@@ -452,7 +466,7 @@ strategy_out = out_sample["strategy_gross"]
 #assemble dicts with risk return metrics
 ratios_BM_in = {"Avg. Yearly Return": nday_ret(BM_in, N = 250),
          "Avg. Yearly Sharp Ratio": sharp_ratio(BM_in, days = 250, rf_rate = 0),
-         "Max. Drawdown": maxdd(BM_in, "5d"),
+         "Max. Drawdown": maxdd(BM_in),
          "Alpha (monthly Returns)": "0%",
          "Beta (monthly Returns)": 1,
          "Avg. Ann. Vol": yearly_vol(BM_in, days = 250),
@@ -460,7 +474,7 @@ ratios_BM_in = {"Avg. Yearly Return": nday_ret(BM_in, N = 250),
 
 ratios_BM_out = {"Return YTD": nday_ret(BM_out, TR = True),
          "Avg. Yearly Sharp Ratio": sharp_ratio(BM_out, days = 250, rf_rate = 0),
-         "Max. Drawdown": maxdd(BM_out, "5d"),
+         "Max. Drawdown": maxdd(BM_out),
          "Alpha (weekly Returns)": "0%",
          "Beta (weekly Returns)": 1,
          "Avg. Ann. Vol": yearly_vol(BM_out, days = 250),
@@ -468,31 +482,32 @@ ratios_BM_out = {"Return YTD": nday_ret(BM_out, TR = True),
 
 ratios_strategy_in = {"Avg. Yearly Return": nday_ret(strategy_in, N = 250),
                "Avg. Yearly Sharp Ratio": sharp_ratio(strategy_in, days = 250, rf_rate = 0),
-               "Max. Drawdown": maxdd(strategy_in, "5d"),
-               "Alpha (monthly Returns)": alpha_beta(strategy_in, BM_in, "1M", param = "alpha"),
-               "Beta (monthly Returns)": round(alpha_beta(strategy_in, BM_in, "1M", param = "beta"),2),
+               "Max. Drawdown": maxdd(strategy_in),
+               "Alpha (monthly Returns)": alpha_beta(strategy_in, BM_in, "1M", rf_period = 0, param = "alpha"),
+               "Beta (monthly Returns)": round(alpha_beta(strategy_in, BM_in, "1M", rf_period = 0, param = "beta"),2),
                "Avg. Ann. Vol": yearly_vol(strategy_in, days = 250),
                "5d 99% VAR": NDAYVar(strategy_in, N = 5)}
 
 ratios_strategy_out = {"Return YTD": nday_ret(strategy_out, TR = True),
                 "Avg. Yearly Sharp Ratio": sharp_ratio(strategy_out, days = 250, rf_rate = 0),
-                "Max. Drawdown": maxdd(strategy_out, "5d"),
-                "Alpha (weekly Returns)": alpha_beta(strategy_out, BM_out, "1W", param = "alpha"),
-                "Beta (weekly Returns)": round(alpha_beta(strategy_out, BM_out, "1W", param = "beta"),2),
+                "Max. Drawdown": maxdd(strategy_out),
+                "Alpha (weekly Returns)": alpha_beta(strategy_out, BM_out, "1W", rf_period = 0, param = "alpha"),
+                "Beta (weekly Returns)": round(alpha_beta(strategy_out, BM_out, "1W", rf_period = 0, param = "beta"),2),
                 "Avg. Ann. Vol": yearly_vol(strategy_out, days = 250),
                 "5d 99% VAR": NDAYVar(strategy_out, N = 5)}
 
-risk_factors_out = pd.DataFrame({"Benchmark": ratios_BM_in, "Strategy": ratios_strategy_in})
-risk_factors_in = pd.DataFrame({"Benchmark": ratios_BM_out, "Strategy": ratios_strategy_out})
+risk_factors_in = pd.DataFrame({"Benchmark": ratios_BM_in, "Strategy": ratios_strategy_in})
+risk_factors_out = pd.DataFrame({"Benchmark": ratios_BM_out, "Strategy": ratios_strategy_out})
 
 dfi.export(risk_factors_out, "plots/risk_factors_out.png")
 dfi.export(risk_factors_in, "plots/risk_factors_in.png")
+
 #---------------------------------------------------------------------------
         #Plot Visual Example for in Sample Alpha/ Beta Calculation
 #---------------------------------------------------------------------------
-#plot regression line
 
-params = alpha_beta(strategy_in, BM_in, period = "1M", pct = False)
+#plot regression line
+params = alpha_beta(strategy_in, BM_in, rf_period = 0, period = "1M", pct = False)
 x = np.arange(min(params.get("x"))-0.1, max(params.get("x"))+0.1, 0.01)
 fitted_y = params.get("alpha") + params.get("beta") * x
 
@@ -501,11 +516,11 @@ fig, ax = plt.subplots(figsize = (15,10))
 plt.scatter(params.get("x"), params.get("y"))
 plt.plot(x, fitted_y)
 plt.plot(x, x)
-plt.title("Monthly Returns Strategy vs. Benchmark (in sample)", size = 25)
+plt.title("Monthly Excess Returns Strategy vs. Benchmark (in sample)", size = 25)
 ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
 ax.xaxis.set_major_formatter(mtick.PercentFormatter(1.0))
-plt.ylabel("Monthly Returns Strategy", size = 15)
-plt.xlabel("Monthly Returns Benchmark", size = 15)
+plt.ylabel("Monthly Excess Returns Strategy", size = 15)
+plt.xlabel("Monthly Excess Returns Benchmark", size = 15)
 plt.axhline(0, color = "black", ls = "--", lw = 1)
 plt.axvline(0, color = "black", ls =  "--", lw = 1)
 plt.xticks(size = 15)
@@ -579,7 +594,7 @@ plt.plot(in_sample[["strategy_gross", "benchmark_gross"]])
 plt.legend(in_sample[["strategy_gross", "benchmark_gross"]].columns,
            prop = {"size": 15})
 plt.title("In Sample Strategy Performance", size = 22)
-plt.ylabel("Cumulative Return")
+plt.ylabel("Cumulative Return", size = 15)
 plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b-%Y'))
 plt.gca().xaxis.set_major_locator(mdates.MonthLocator(interval=3))
 plt.xticks(size = 13)
@@ -625,9 +640,9 @@ plt.savefig("plots/outofsamlpe_brekdown.png")
 width = 0.3
 fig, ax = plt.subplots(figsize = (15,10))
 ind = np.arange(len(stocks_invest))
-ax.barh(ind, stocks_invest.weights, width, label = "Strategy Weights")
-ax.barh(ind + width, stocks_invest.index_weights, width, label = "Index Weights")
-ax.barh(ind + 2* width, stocks_invest.weights_unconst, width, label = "Unconstrained Strategy Weights")
+ax.barh(ind, stocks_invest.weights, width, label = "Strategy")
+ax.barh(ind + width, stocks_invest.index_weights, width, label = "Index")
+ax.barh(ind + 2* width, stocks_invest.weights_unconst, width, label = "Unconstrained Strategy")
 ax.set(yticks = ind + width, yticklabels = stocks_invest.Name)
 ax.legend(prop={'size': 10})
 ax.xaxis.set_major_formatter(mtick.PercentFormatter(1.0))
@@ -649,8 +664,8 @@ country_weights = pd.DataFrame(country_weights, index = country_weights_index.in
 width = 0.3
 fig, ax = plt.subplots(figsize = (15,10))
 ind = np.arange(len(country_weights))
-ax.barh(ind, country_weights.weights, width, label = "Strategy Weights")
-ax.barh(ind + width, country_weights.index_weights, width, label = "Index Weights")
+ax.barh(ind, country_weights.weights, width, label = "Strategy")
+ax.barh(ind + width, country_weights.index_weights, width, label = "Index")
 ax.set(yticks = ind + width, yticklabels = country_weights.index)
 ax.legend(prop={'size': 15})
 ax.xaxis.set_major_formatter(mtick.PercentFormatter(1.0))
@@ -674,8 +689,8 @@ currency_weights = currency_weights.rename(index = {"GBp": "GBP"})
 width = 0.4
 fig, ax = plt.subplots()
 ind = np.arange(len(currency_weights_index))
-ax.barh(ind, currency_weights.weights, width, label = "Strategy Weights")
-ax.barh(ind + width, currency_weights.index_weights, width, label = "Index Weights")
+ax.barh(ind, currency_weights.weights, width, label = "Strategy")
+ax.barh(ind + width, currency_weights.index_weights, width, label = "Index")
 ax.set(yticks = ind + width, yticklabels = currency_weights.index)
 ax.legend(["Strategy", "Index"])
 plt.title("Currency Weights Strategy vs Index", size = 20)
@@ -696,8 +711,8 @@ sector_weights = sector_weights_index.join(sector_weights_strategy)
 width = 0.4
 fig, ax = plt.subplots(figsize=(15, 10))
 ind = np.arange(len(sector_weights))
-ax.barh(ind, sector_weights.index_weights, width, label = "Strategy Weights")
-ax.barh(ind + width, sector_weights.weights, width, label = "Index Weights")
+ax.barh(ind, sector_weights.index_weights, width, label = "Index")
+ax.barh(ind + width, sector_weights.weights, width, label = "Strategy")
 ax.set(yticks = ind + width, yticklabels = sector_weights.index)
 ax.legend(prop = {"size": 20})
 plt.title("Sector Weights Strategy vs Index", size = 25)
@@ -727,7 +742,7 @@ plt.xticks(size = 15)
 plt.yticks(size = 15)
 plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%b-%Y'))
 plt.gca().xaxis.set_major_locator(mdates.MonthLocator(interval=1))
-plt.savefig("comparison.png")
+plt.savefig("plots/comparison.png")
 
 #---------------------------------------------------------------------------
     #calculate change of correlation  matrix in vs out of sample
@@ -755,7 +770,7 @@ stocks_long = stocks_invest[stocks_invest.weights > 0]
 #dividend yield
 div_yield_long = (stocks_long.weights / stocks_long.weights.sum() * stocks_long.Yield).sum()
 div_yield_short = (stocks_short.weights.abs()/ stocks_short.weights.abs().sum() * stocks_short.Yield).sum()
-div_yield_index = (stocks_index.index_weights * stocks_index.Yield).sum()
+div_yield_index = (stocks_index.index_weights / stocks_index.index_weights.sum() * stocks_index.Yield).sum()
 
 #trailing PE Ratio, forward PE, PB Ratio
 
@@ -775,20 +790,20 @@ index.PB_Ratio = np.where(index.PB_Ratio > 25, 25, index.PB_Ratio)
 short = index.loc[stocks_short.index]
 long = index.loc[stocks_long.index]
 
-#calculate Trailing PE
+#calculate weighted Trailing PE
 PE_long = (long.weights / long.weights.sum() * long.Trailing_PE).sum()
 PE_short = (short.weights / short.weights.sum() * short.Trailing_PE).sum()
-PE_index = (index.index_weights * index.Trailing_PE).sum()
+PE_index = (index.index_weights / index.index_weights.sum() * index.Trailing_PE).sum()
 
-#calculate forward PE
+#calculate weighted forward PE
 PE_fwd_long = (long.weights / long.weights.sum() * long.Forward_PE).sum()
 PE_fwd_short = (short.weights / short.weights.sum() * short.Forward_PE).sum()
-PE_fwd_index = (index.index_weights * index.Forward_PE).sum()
+PE_fwd_index = (index.index_weights / index.index_weights.sum() * index.Forward_PE).sum()
 
 #calculate PB Ratio
 PB_long = (long.weights / long.weights.sum() * long.PB_Ratio).sum()
 PB_short = (short.weights / short.weights.sum() * short.PB_Ratio).sum()
-PB_index = (index.index_weights * index.PB_Ratio).sum()
+PB_index = (index.index_weights / index.index_weights.sum() * index.PB_Ratio).sum()
 
 #assemble metrics dataframe
 ratios_short = {"Yield": to_pct(div_yield_short,2),

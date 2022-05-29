@@ -38,7 +38,7 @@ with reinvested dividends)
 """
 
 benchmark = yf.download(tickers = "EUNA.AS", interval = "1d", start = start_backtesting, end = dt.date.today())
-benchmark_dividends = pd.read_csv("dividends_benchmark.csv")
+benchmark_dividends = pd.read_csv("files/dividends_benchmark.csv")
 benchmark_dividends.index = pd.to_datetime(benchmark_dividends.Date, format = "%d.%m.%Y")
 benchmark_dividends = benchmark_dividends.drop("Date", axis = 1)
 
@@ -58,7 +58,7 @@ benchmark_gross = pd.DataFrame({"Adj Close": benchmark_gross})
 benchmark = pd.DataFrame({"benchmark_gross": benchmark_gross["Adj Close"], "benchmark_net": benchmark_net["Adj Close"]},
                          index = benchmark_net.index)
 
-benchmark.to_csv("benchmark.csv")
+benchmark.to_csv("files/benchmark.csv")
 
 #--------------------------------------------------------------------------------------------------
 """
@@ -203,7 +203,7 @@ stocks_indexweights = np.array([1.19, 0.99, 1.36, 1.52, 1.37, 1.77, 0.99, 6.12,
 stocks["index_weights"] = stocks_indexweights
 
 #write data to CSV
-stocks.to_csv("index_constituents_data.csv")
+stocks.to_csv("files/index_constituents_data.csv")
 
 ############################################################################
 #Download Prices of Benchmark constituents and Exchange Rates to convert all Prices to EUR
@@ -250,7 +250,7 @@ for i in Net_Price.columns:
     Gross_Price[i] = temp
 
 #export gross prices in local currency as csv
-Gross_Price.to_csv("Gross_Prices_localccy.csv")
+Gross_Price.to_csv("files/Gross_Prices_localccy.csv")
 
 #convert all prices to EUR!!! (gross and net)
 adj_prices_gross = Gross_Price.join(e_rates)
@@ -274,5 +274,5 @@ adj_prices_net = adj_prices_net[Gross_Price.columns]
 adj_prices_gross = adj_prices_gross[Gross_Price.columns]
 
 #write to csv files
-adj_prices_net.to_csv("Net_Prices_EUR.csv")
-adj_prices_gross.to_csv("Gross_Prices_EUR.csv")
+adj_prices_net.to_csv("files/Net_Prices_EUR.csv")
+adj_prices_gross.to_csv("files/Gross_Prices_EUR.csv")

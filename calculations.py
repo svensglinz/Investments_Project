@@ -418,7 +418,7 @@ def maxdd(price, pct = True):
         return maxdd
 
 #---------------------------------------------------------------------------
-                        #N Day unfiltered 99% VAR
+                        #N Day unfiltered historical 1% VAR
 #---------------------------------------------------------------------------
 
 #N as number of days (integer)
@@ -461,7 +461,7 @@ ratios_BM_in = {"Avg. Yearly Return": nday_ret(BM_in, N = 250),
          "Alpha (monthly Returns)": "0%",
          "Beta (monthly Returns)": 1,
          "Avg. Ann. Vol": yearly_vol(BM_in, days = 250),
-         "5d 99% VAR": NDAYVar(BM_in, N = 5)}
+         "5d 1% Hist. VAR": NDAYVar(BM_in, N = 5)}
 
 ratios_BM_out = {"Return YTD": nday_ret(BM_out, TR = True),
          "Avg. Yearly Sharp Ratio": sharp_ratio(BM_out, days = 250, rf_rate = 0),
@@ -469,7 +469,7 @@ ratios_BM_out = {"Return YTD": nday_ret(BM_out, TR = True),
          "Alpha (weekly Returns)": "0%",
          "Beta (weekly Returns)": 1,
          "Avg. Ann. Vol": yearly_vol(BM_out, days = 250),
-         "5d 99% VAR": NDAYVar(BM_out, N = 5)}
+         "5d 1% Hist. VAR": NDAYVar(BM_out, N = 5)}
 
 ratios_strategy_in = {"Avg. Yearly Return": nday_ret(strategy_in, N = 250),
                "Avg. Yearly Sharp Ratio": sharp_ratio(strategy_in, days = 250, rf_rate = 0),
@@ -477,7 +477,7 @@ ratios_strategy_in = {"Avg. Yearly Return": nday_ret(strategy_in, N = 250),
                "Alpha (monthly Returns)": alpha_beta(strategy_in, BM_in, "1M", rf_period = 0, param = "alpha"),
                "Beta (monthly Returns)": round(alpha_beta(strategy_in, BM_in, "1M", rf_period = 0, param = "beta"),2),
                "Avg. Ann. Vol": yearly_vol(strategy_in, days = 250),
-               "5d 99% VAR": NDAYVar(strategy_in, N = 5)}
+               "5d 1% Hist. VAR": NDAYVar(strategy_in, N = 5)}
 
 ratios_strategy_out = {"Return YTD": nday_ret(strategy_out, TR = True),
                 "Avg. Yearly Sharp Ratio": sharp_ratio(strategy_out, days = 250, rf_rate = 0),
@@ -485,7 +485,7 @@ ratios_strategy_out = {"Return YTD": nday_ret(strategy_out, TR = True),
                 "Alpha (weekly Returns)": alpha_beta(strategy_out, BM_out, "1W", rf_period = 0, param = "alpha"),
                 "Beta (weekly Returns)": round(alpha_beta(strategy_out, BM_out, "1W", rf_period = 0, param = "beta"),2),
                 "Avg. Ann. Vol": yearly_vol(strategy_out, days = 250),
-                "5d 99% VAR": NDAYVar(strategy_out, N = 5)}
+                "5d 1% hist. VAR": NDAYVar(strategy_out, N = 5)}
 
 risk_factors_in = pd.DataFrame({"Benchmark": ratios_BM_in, "Strategy": ratios_strategy_in})
 risk_factors_out = pd.DataFrame({"Benchmark": ratios_BM_out, "Strategy": ratios_strategy_out})

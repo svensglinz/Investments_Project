@@ -340,16 +340,6 @@ out_sample.to_csv("files/out_sample.csv")
 #############################################################################
 
 #---------------------------------------------------------------------------
-                        #Percent Formatting
-#---------------------------------------------------------------------------
-#Function that returns a float number rounded to n digits and returns
-#it as a string with "%" in the end (ie. in: 0.467, out: 46.7%)
-
-def to_pct(x, digits):
-    out = str(round(x * 100, digits)) + "%"
-    return out
-
-#---------------------------------------------------------------------------
                         #Annualized Sharp Ratio
 #---------------------------------------------------------------------------
 
@@ -372,7 +362,7 @@ def yearly_vol(price, days, pct = True):
     vol = m.sqrt(price.pct_change().var() * days)
 
     if pct:
-        return to_pct(vol, 2)
+        return format(vol, ".2%")
     else:
         return vol
 
@@ -399,7 +389,7 @@ def alpha_beta(strategy, benchmark, period, rf_period, pct = True, **kwargs):
     beta = model.coef_[0][0]
 
     if pct:
-        alpha = to_pct(model.intercept_[0],2)
+        alpha = format(model.intercept_[0], ".2%")
     else:
         alpha = model.intercept_[0]
 
@@ -423,7 +413,7 @@ def maxdd(price, pct = True):
     maxdd = (diffmax -1).min()
 
     if pct:
-        return to_pct(maxdd, 2)
+        return format(maxdd, ".2%")
     else:
         return maxdd
 
@@ -439,7 +429,7 @@ def NDAYVar(price, N, pct = True):
     VAR = nday_ret.quantile(0.01)
 
     if pct:
-        return to_pct(np.abs(VAR), 2)
+        return format(np.abs(VAR), ".2%")
     else:
         return np.abs(VAR)
 
@@ -454,7 +444,7 @@ def nday_ret(price, N = None, TR = False, pct = True):
     else:
         ret = price.pct_change().mean() * N
     if pct:
-        return to_pct(ret, 2)
+        return format(ret, ".2%")
     else:
         return ret
 
@@ -750,7 +740,7 @@ plt.savefig("plots/comparison.png")
 #---------------------------------------------------------------------------
 
 out_sample_cor = Gross_Price_selected[Gross_Price_selected.index > end_backtesting].pct_change().corr()
-in_sample_cor =  Gross_Price_selected[Gross_Price_selected.index < end_backtesting].pct_change().corr()
+in_sample_cor = Gross_Price_selected[Gross_Price_selected.index < end_backtesting].pct_change().corr()
 
 rel_cor = out_sample_cor / in_sample_cor
 pd.DataFrame(rel_cor).to_csv("files/correlation_change.csv")
@@ -807,17 +797,17 @@ PB_short = (short.weights / short.weights.sum() * short.PB_Ratio).sum()
 PB_index = (index.index_weights / index.index_weights.sum() * index.PB_Ratio).sum()
 
 #assemble metrics dataframe
-ratios_short = {"Yield": to_pct(div_yield_short,2),
+ratios_short = {"Yield": format(div_yield_short,".2%"),
                 "Price_Book": round(PB_short,2),
                 "Trailing_PE": round(PE_short,2),
                 "Forward_PE": round(PE_fwd_short,2)}
 
-ratios_long = {"Yield": to_pct(div_yield_long,2),
+ratios_long = {"Yield": format(div_yield_long,".2%"),
                "Price_Book": round(PB_long,2),
                "Trailing_PE": round(PE_long,2),
                "Forward_PE": round(PE_fwd_long,2)}
 
-ratios_index = {"Yield": to_pct(div_yield_index,2),
+ratios_index = {"Yield": format(div_yield_index,".2%"),
                 "Price_Book": round(PB_index,2),
                 "Trailing_PE": round(PE_index,2),
                 "Forward_PE": round(PE_fwd_index,2)}

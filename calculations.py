@@ -485,7 +485,7 @@ ratios_strategy_out = {"Return YTD": nday_ret(strategy_out, TR = True),
                 "Alpha (weekly Returns)": alpha_beta(strategy_out, BM_out, "1W", rf_period = 0, param = "alpha"),
                 "Beta (weekly Returns)": round(alpha_beta(strategy_out, BM_out, "1W", rf_period = 0, param = "beta"),2),
                 "Avg. Ann. Vol": yearly_vol(strategy_out, days = 250),
-                "5d 1% hist. VAR": NDAYVar(strategy_out, N = 5)}
+                "5d 1% Hist. VAR": NDAYVar(strategy_out, N = 5)}
 
 risk_factors_in = pd.DataFrame({"Benchmark": ratios_BM_in, "Strategy": ratios_strategy_in})
 risk_factors_out = pd.DataFrame({"Benchmark": ratios_BM_out, "Strategy": ratios_strategy_out})

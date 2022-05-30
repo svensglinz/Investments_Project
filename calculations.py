@@ -128,7 +128,14 @@ MSRP_unconst = minimize(sharpe, x0, method='SLSQP', args=(ER,S), constraints = c
 #complete data set of selected stocks with calculated constrained MSRP values & export for presentation
 stocks_invest = stocks_invest.assign(weights = MSRP_const.x)
 stocks_invest = stocks_invest.assign(weights_unconst = MSRP_unconst.x)
-dfi.export(stocks_invest, "plots/selected_portfolio_characteristics.png")
+
+stocks_invest_export = stocks_invest
+stocks_invest_export["Yield"] = stocks_invest_export["Yield"].map('{:,.2%}'.format)
+stocks_invest_export["weights"] = stocks_invest_export["weights"].map('{:,.2%}'.format)
+stocks_invest_export["index_weights"] = stocks_invest_export["index_weights"].map('{:,.2%}'.format)
+stocks_invest_export["weights_unconst"] = stocks_invest_export["weights_unconst"].map('{:,.2%}'.format)
+
+dfi.export(stocks_invest_export, "plots/selected_portfolio_characteristics.png")
 
 #---------------------------------------------------------------------------
                   #Visualize efficient Frontier

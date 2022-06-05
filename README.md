@@ -3,6 +3,8 @@
 This script was written for a group project for the Class Investments at NCCU. 
 The script was run at the end of May 2022 so running the script now could produce slightly different results (especially for stock ratio data such as PE Ratio, PB Ratio etc. which are as of the day the script is run.  
 
+The code is written in Python 3.9. 
+
 ## Motivation
 
 We implement a quantitative equity strategy whereby we select stocks from the Stoxx Europe 50 index which comprises of some of the largest companies in Europe.

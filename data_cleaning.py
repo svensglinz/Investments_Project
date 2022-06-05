@@ -1,6 +1,6 @@
 """
 This file assembles a data frame which contains all stocks from the stoxx europe 50 index
-and includes various stock ratios such as PE7/ PB dividend yield etc.
+and includes various stock ratios such as PE/ PB ratios, dividend yield as of 31.12.2021 etc.
 Further, we download the prices of all index constituents and the index itself
 and modify them to get the gross values (incl. dividends)
 We export all prices as csv files which can be used as inputs for the script "calculation.py"
@@ -17,6 +17,9 @@ import random
 ############################################################################
 # define parameters of investment period start
 ############################################################################
+
+#start_backtesting is the minimum value. As it turns out, one of the stocks in our portfolio
+#only IPO'd in 2019 and thus, our in-sampel period is accordingly cut short.
 
 start_backtesting = np.datetime64("2011-01-01")
 end_backtesting = np.datetime64("2021-12-31")
@@ -63,10 +66,13 @@ benchmark.to_csv("files/benchmark.csv")
 """
 Download ticker symbols for investment universe which is the stoxx europe 50 index.
 as there are no ticker symbols available on the webpage do the following:
-1: download names of index constituents form wikipedia
+1: download names of index constituents from wikipedia
 2: download names and ticker of euro stoxx 50 from wikipedia
 3: join the two since many constituents are overlapping
 4 check which tickers are still missing and manually complete them!
+
+!!! Warning: Running this code in the future could produce errors if the information on the pages that we scrape 
+changes
 """
 
 # Retreive Stoxx Europe 50 Data
@@ -117,7 +123,7 @@ unfortunately accessing yfinance via api (yfinance package) does not always
 return dividends or ratio information even if they exist.
 Thus, for ratios and dividends we rely on yahoo_fin module which is much more reliable.
 However, since it scrapes the data directly from the website and yahoo has very strict
-rate limits, we pause the loop for a random time(between 30 & 80 seconds) after the website returns that we cannot
+rate limits, we pause the loop for a random time(between 100 & 200 seconds) after the website returns that we cannot
 fetch any more data.
 We notice that we are blocked by the website if: 
 dividend data frame comes back empty --> indexerror is raised by loop 
@@ -126,11 +132,13 @@ that the rate limit has been reached
 """
 
 """
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!! Warning: 
 This loop can take quite a long time to complete!
 If you wish to skip this step, please continue below and just import the results 
 of this loop as a csv
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+- Also, the ratios which we download (eg. PB / PE ratios are the ratios from the day the script is run. Therefore 
+running the script at different times could produce slightly different results as unfortunately, we were 
+only able to get the most recent ratios and not the ratios per a specific date.
 """
 
 i = 0
@@ -181,7 +189,7 @@ while i in range(len(Stock_Tickers)):
 
     # loop is paused after rate limit has been reached
     except IndexError:
-        pause = random.randint(30, 80)
+        pause = random.randint(100, 200)
         print("pause for " + str(pause) + " seconds")
         time.sleep(pause)
         continue
@@ -214,7 +222,7 @@ stocks["index_weights"] = stocks_indexweights
 stocks.to_csv("files/index_constituents_data.csv")
 
 """
-If you chose not to run the loop anove, run the below code to continue
+If you chose not to run the loop above, run the below code to continue
 --> CODE: stocks = pd.read_csv("files/index_constituents_data.csv)
 """
 
@@ -228,15 +236,16 @@ Net_Price = Net_Price["Adj Close"]
 # get unique currencies of stocks
 currencies = stocks.Currency.unique()
 
-# download exchange rates against eur of all currencies which are represented in the index
+# download exchange rates against EUR of all currencies which are represented in the index
 e_rates = yf.download(tickers=["CHFEUR=X", "DKKEUR=X", "GBPEUR=X"], start=start_backtesting, end=end_out_sample,
                       interval="1d")
 e_rates = e_rates["Adj Close"]
 e_rates = e_rates.rename(columns={"CHFEUR=X": "CHF", "DKKEUR=X": "DKK", "GBPEUR=X": "GBP"})
 
-# delete values where we do not have values for each trading day! (or fill with last available value)
-Net_Price = Net_Price.fillna(0)
+# fill values where we do not have data with previous value or delete if it is the first value
+
 Net_Price = pd.DataFrame(Net_Price).fillna(method="ffill")
+Net_Price = Net_Price.fillna(0)
 Net_Price = Net_Price.loc[np.all(Net_Price != 0, axis=1)]
 
 ############################################################################
@@ -266,7 +275,7 @@ for i in Net_Price.columns:
 # export gross prices in local currency as csv
 Gross_Price.to_csv("files/Gross_Prices_localccy.csv")
 
-# convert all prices to EUR!!! (gross and net)
+# convert all prices to EUR! (gross and net)
 adj_prices_gross = Gross_Price.join(e_rates)
 adj_prices_net = Net_Price.join(e_rates)
 

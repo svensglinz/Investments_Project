@@ -23,7 +23,7 @@ import dataframe_image as dfi
 #############################################################################
 #                                                                           #
 #                                #SECTION 1                                 #
-#       Define key parameters, import needed files and define investment   #
+#       Define key parameters, import needed files and define investment    #
 #       universe of stocks which the strategy invests in                    #
 #                                                                           #
 #############################################################################
@@ -49,7 +49,7 @@ benchmark.index = pd.to_datetime(benchmark.index)
 Select stocks which the strategy invests in
 our strategy goes long in the top 10 highest dividend stocks and short in the
 top 10 lowest dividend stocks --> We select these stocks as our investmnet stocks
-drop BHP stock for which dividends have not been calculated correctly!
+Also: drop BHP stock for which dividends have not been calculated correctly!
 """
 
 stocks_index = stocks_index.sort_values(by="Yield", ascending=False)
@@ -73,7 +73,6 @@ Net_Price_selected = Net_Price[stocks_invest.index]
 rf_daily = 0
 ER = Gross_Price_selected[Gross_Price_selected.index < end_backtesting].pct_change().mean()
 S = Gross_Price_selected[Gross_Price_selected.index < end_backtesting].pct_change().cov()
-
 
 # define functions for optimization (variance, return,  negative sharp ratio)
 def pvar(w, S):
@@ -130,7 +129,7 @@ MSRP_unconst = minimize(sharpe, x0, method='SLSQP', args=(ER, S), constraints=co
 stocks_invest = stocks_invest.assign(weights=MSRP_const.x)
 stocks_invest = stocks_invest.assign(weights_unconst=MSRP_unconst.x)
 
-stocks_invest_export = stocks_invest
+stocks_invest_export = stocks_invest.copy()
 stocks_invest_export["Yield"] = stocks_invest_export["Yield"].map('{:,.2%}'.format)
 stocks_invest_export["weights"] = stocks_invest_export["weights"].map('{:,.2%}'.format)
 stocks_invest_export["index_weights"] = stocks_invest_export["index_weights"].map('{:,.2%}'.format)
@@ -154,7 +153,10 @@ which consists of a random array and a modulus operation which should randomize 
 results. We can then calculate the expected return and variance of these portfolios and add them 
 to the plot.
 """
-# calculate volatility and expected return of GMVP and MSRP constrained for plotting further below
+
+# calculate yearly volatility and expected return of GMVP and MSRP constrained for plotting further below
+# assumption: year = 250 trading days
+
 GMVP_const_ER = pret(w=GMVP_const.x, ER=ER) * 250
 GMVP_const_VAR = m.sqrt(pvar(w=GMVP_const.x, S=S) * 250)
 MSRP_const_ER = pret(w=MSRP_const.x, ER=ER) * 250
@@ -305,8 +307,7 @@ def indexed_performance(start, prices, weights, end=None):
 
 
 # calculate weights of short stocks / long stocks  that they sum up to 1
-weights_short = stocks_invest.weights[stocks_invest.weights < 0] / stocks_invest.weights[
-    stocks_invest.weights < 0].sum()
+weights_short = stocks_invest.weights[stocks_invest.weights < 0] / stocks_invest.weights[stocks_invest.weights < 0].sum()
 weights_long = stocks_invest.weights[stocks_invest.weights > 0] / stocks_invest.weights[stocks_invest.weights > 0].sum()
 
 # calculate the needed indexed performance series
@@ -391,8 +392,9 @@ def yearly_vol(price, days, pct=True):
 # ---------------------------------------------------------------------------
 
 # period = period of returns for which regression should be run (eg. "1Y", "1M", "1d")
-# kwargs = optional where only alpha, beta, x or y can be returned form function (param!)
+# kwargs = optional where only alpha, beta, x or y can be returned form function (keyword = param)
 # rf_rate = risk free rate for the "period"
+
 def alpha_beta(strategy, benchmark, period, rf_period, pct=True, **kwargs):
     daily_ret_strategy = strategy.pct_change().fillna(0) + 1
     daily_ret_BM = benchmark.pct_change().fillna(0) + 1
@@ -435,7 +437,6 @@ def maxdd(price, pct=True):
         return format(maxdd, ".2%")
     else:
         return maxdd
-
 
 # ---------------------------------------------------------------------------
 # N Day unfiltered historical 1% VAR

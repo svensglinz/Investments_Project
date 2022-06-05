@@ -1,19 +1,13 @@
 ## Description 
 
 This script was written for a group project for the Class Investments at NCCU. 
-
-*Team Members:*
-
--
-- 
-- 
-- 
+The script was run at the end of May 2022 so running the script now could produce slightly different results (especially for stock ratio data such as PE Ratio, PB Ratio etc. which are as of the day the script is run.  
 
 ## Motivation
 
 We implement a quantitative equity strategy whereby we select stocks from the Stoxx Europe 50 index which comprises of some of the largest companies in Europe.
 
-Inspired by the "dogs of the dow strategy which predicts an outperformance of the 10 highest dividend yielding stocks in the dow vs the total index, we restrict the portfolio to be long in the top 10 dividend yielding stocks in the stoxx europe 50. Additionally, we go short in the 10 lowest yielding dividend stocks. This is motivated by the believe that after our in sample period ends (31.12.2021), rising interst rates and inflation will lead to a correlation breakdown between low and high dividend yield stocks where high dividend yield stocks will outperform short dividend yield stocks.
+Inspired by the "dogs of the dow" strategy which predicts an outperformance of the 10 highest dividend yielding stocks in the dow vs the total index, we restrict the portfolio to be long in the top 10 dividend yielding stocks in the stoxx europe 50. Additionally, we go short in the 10 lowest yielding dividend stocks. This is motivated by the believe that after our in sample period ends (31.12.2021), rising interst rates and inflation will lead to a correlation breakdown between low and high dividend yield stocks where high dividend yield stocks will outperform low dividend yield stocks.
 
 ## Implementation
 

@@ -157,7 +157,7 @@ while i in range(len(Stock_Tickers)):
             dividends_year = dividends.iloc[(dividends.index >= start_dividends) & (dividends.index < end_dividends)]
             dividends_year = dividends_year.sum()
             price = ticker.history(start=end_backtesting - 10, end=end_backtesting)
-            price = price.Close
+            price = price.Close.fillna(method="ffill")
             price = price[-1]
             div_yield = (dividends_year / price)[0]
 

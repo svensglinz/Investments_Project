@@ -21,7 +21,7 @@ In the Optimnization, we include the following restrictions on our portfolio:
 - The maximum value for long (short) investmnets is 20% (-20%)
 - The total allocation in stocks is 100% (no leverage, 100% invested)
 
-our backtesting period is: 2019 - end of 2021 and our out of sample period is: start of 2022 - 24.05.2022
+our backtesting period is: 2019 - end of 2021 and our out of sample period is: start of 2022 - 21.05.2022
 
 ## Results 
 The table shows the selected stocks in the strategy, some quantitative ratios such as their yields or PE ratios as well as the weights allocated in our strategy and the weights that would have been used had we not implemented resrictions beyond the 100% total allocation restriction.
